@@ -25,7 +25,7 @@ This API is a POST methods and requires body data.
 The URL you will be getting data from
 
 ```
-POST https://ebay-average-price.herokuapp.com
+POST https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems
 ```
 
 ## Routes <a name = "routes"></a>
@@ -35,6 +35,12 @@ Returns all data for completed sales
 /findCompletedItems
 ```
 ### Request
+
+#### Headers
+* content-type: application/json
+* x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com
+* x-rapidapi-key: */*YOUR KEY/**
+
 #### Body Data
 * **keywords**
     * Description: Keywords entered into the eBay searchbar to refine results. Seperated by spaces
