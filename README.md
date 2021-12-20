@@ -123,7 +123,7 @@ Returns all data for completed sales
 
 ##### cURL
 ```curl
-curl --location --request POST 'https://ebay-average-price.herokuapp.com/findCompletedItems' \
+curl --location --request POST 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "keywords": "iPhone",
@@ -158,7 +158,7 @@ curl --location --request POST 'https://ebay-average-price.herokuapp.com/findCom
 var request = require('request');
 var options = {
   'method': 'POST',
-  'url': 'https://ebay-average-price.herokuapp.com/findCompletedItems',
+  'url': 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems',
   'headers': {
     'Content-Type': 'application/json'
   },
@@ -201,7 +201,7 @@ request(options, function (error, response) {
 import requests
 import json
 
-url = "https://ebay-average-price.herokuapp.com/findCompletedItems"
+url = "https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems"
 
 payload = json.dumps({
   "keywords": "iPhone",
