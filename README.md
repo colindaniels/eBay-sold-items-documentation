@@ -254,6 +254,7 @@ Reach out to us through RapidAPI and we will update our API and help you with an
 - [NodeJs](https://nodejs.org/en/) - Server Environment
 - [Axios](https://axios-http.com) - Server Requests
 - [Cheerio](https://cheerio.js.org/) - HTML Parsing
+- [Puppeteer](https://www.npmjs.com/package/puppeteer) - Browser Automation
 
 ## ✍️ Authors <a name = "authors"></a>
 - [@colindaniels](https://github.com/colindaniels) - Idea & All Work
