@@ -238,6 +238,10 @@ print(response.text)
 
 
 ## 🔧 Troubleshooting <a name = "troubleshooting"></a>
+
+#### Long request time
+If you've noticed that every once in a while your requests will take well over 10 seconds, there is a reason for that. eBay requires a captcha to be solved every few hours when requesting data for sold items. When our server detects a captcha is required, it will automatically solve it and send you the results for the data once it is avalible, but this can take a few seconds to complete. A captcha is only required once every few hours, but should not effect the success rate or results of the data.
+
 #### Aspects
 Some aspects on eBay have a different url value then what is shown on the site. If the aspect is not working, make sure that aspect can be used with the category you have selected. Then visit the response_url and select the aspect you want shown. Navigate to the url bar and look for a substring where the new aspect was updated. For example eBay shows "condition" as one of the aspect names, but the actual value in the url is "LH_ItemCondition", and the valeus are condition id's and not condition names.
 
