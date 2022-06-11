@@ -66,6 +66,21 @@ Returns all data for completed sales
     * Required: No (**HIGHLY RECOMMENDED**)
 <br/>
 
+* **remove_outliers**
+    * Description: If set to true, it will remove all outliers with prices way too high or low from the results.
+    * Example: "false"
+    * Required: No
+<br/>
+
+* **site_id**
+    * Description: The ebay site ID that eBay will use. Different terretories use different sites. 
+To find site ID values, navigate to: https://developer.ebay.com/devzone/finding/callref/Enums/GlobalIdList.html
+    * Example: "0" - United States
+    * Required: No - (defaults to "0")
+<br/>
+
+
+
 * **aspects**
     * Description: A list of eBay aspects to help refile search results. For each aspect, the only allwoed parameters are: "name" and "value" and values for each are required. These aspects are the same as the filters you see on the eBay site when looking for spicific models or colors of products.
     * Example: 
@@ -89,31 +104,31 @@ Returns all data for completed sales
 ```json
 {
     "success": true,
-    "average_price": 271.13,
-    "min_price": 120,
-    "max_price": 369.26,
-    "results": 173,
-    "response_url": "https://www.ebay.com/sch/9335/i.html?_nkw=iPhone+-locked+-cracked+-case+-box+-read&LH_Sold=1&LH_Complete=1&_ipg=200&Model=Apple%2520iPhone%2520X&LH_ItemCondition=3000&Network=Unlocked&Storage%2520Capacity=64%2520GB",
-    "products": 
-    [
+    "average_price": 226.47,
+    "median_price": 220.5,
+    "min_price": 149.99,
+    "max_price": 319,
+    "results": 189,
+    "response_url": "https://www.ebay.com/sch/9355/i.html?_nkw=iPhone+-locked+-cracked+-case+-box+-read+-LCD+-face&LH_Sold=1&LH_Complete=1&_ipg=240&Model=Apple%2520iPhone%2520X&LH_ItemCondition=3000&Network=Unlocked&Storage%2520Capacity=256%2520GB",
+    "products": [
         {
-            "title": "Apple iPhone X - 64GB - Space Gray (Unlocked) A1901 (GSM) (CA)",
-            "sale_price": 237.5,
-            "date_sold": "Dec 8, 2021",
-            "link": "https://www.ebay.com/itm/353792150540?epid=239093115&hash=item525fa7cc0c%3Ag%3A%7EuMAAOSwmehhp4oM&LH_ItemCondition=3000"
+            "title": "Apple iPhone X - 256GB - (Unlocked)  - Works Great - (#8076)",
+            "sale_price": 211.99,
+            "date_sold": "Jun 11, 2022",
+            "link": "https://www.ebay.com/itm/185450226888?hash=item2b2db1e4c8%3Ag%3AEmwAAOSw8DJierSB&LH_ItemCondition=3000"
         },
         {
-            "title": "Apple iPhone X Space Gray 64GB Unlocked(GSM+CDMA) G208",
-            "sale_price": 305,
-            "date_sold": "Dec 8, 2021",
-            "link": "https://www.ebay.com/itm/255262751845?epid=16032638976&hash=item3b6ed87c65%3Ag%3AAsgAAOSwFtVhrMCq&LH_ItemCondition=3000"
+            "title": "Apple iPhone X 256GB Unlocked Silver White A1901 iOS 13.6",
+            "sale_price": 269,
+            "date_sold": "Jun 11, 2022",
+            "link": "https://www.ebay.com/itm/115419688300?epid=239160803&hash=item1adf8cad6c%3Ag%3ASQkAAOSwUWRiiTwo&LH_ItemCondition=3000"
         },
         {
-            "title": "Apple iPhone X Space Gray 64GB Unlocked(GSM+CDMA) G210",
-            "sale_price": 276,
-            "date_sold": "Dec 8, 2021",
-            "link": "https://www.ebay.com/itm/255262748698?epid=16032638976&hash=item3b6ed8701a%3Ag%3AivAAAOSwcBphrL9u&LH_ItemCondition=3000"
-        }
+            "title": "Apple iPhone X GSM Smartphone - Space Gray/256GB/Unlocked",
+            "sale_price": 207.5,
+            "date_sold": "Jun 11, 2022",
+            "link": "https://www.ebay.com/itm/394105212129?epid=28039771047&hash=item5bc2804ce1%3Ag%3AGusAAOSw-cpinkmi&LH_ItemCondition=3000"
+        },
         ...
     ]
 ```
@@ -123,15 +138,16 @@ Returns all data for completed sales
 
 ##### cURL
 ```curl
-curl --location --request POST 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems' \
+curl --location --request POST 'https://ebay-sold-items-api.herokuapp.com/findCompletedItems' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read",
-    "max_search_results": "200",
+    "excluded_keywords": "locked cracked case box read LCD face",
+    "max_search_results": "240",
     "category_id": "9355",
-    "aspects": 
-    [
+    "remove_outliers": true,
+    "site_id": "0",
+    "aspects": [
         {
             "name": "Model",
             "value": "Apple iPhone X"
@@ -146,7 +162,7 @@ curl --location --request POST 'https://ebay-average-selling-price.p.rapidapi.co
         },
         {
             "name": "Storage Capacity",
-            "value": "64 GB"            
+            "value": "256 GB"
         }
     ]
 }'
@@ -158,15 +174,17 @@ curl --location --request POST 'https://ebay-average-selling-price.p.rapidapi.co
 var request = require('request');
 var options = {
   'method': 'POST',
-  'url': 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems',
+  'url': 'https://ebay-sold-items-api.herokuapp.com/findCompletedItems',
   'headers': {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
     "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read",
-    "max_search_results": "200",
+    "excluded_keywords": "locked cracked case box read LCD face",
+    "max_search_results": "240",
     "category_id": "9355",
+    "remove_outliers": true,
+    "site_id": "0",
     "aspects": [
       {
         "name": "Model",
@@ -182,7 +200,7 @@ var options = {
       },
       {
         "name": "Storage Capacity",
-        "value": "64 GB"
+        "value": "256 GB"
       }
     ]
   })
@@ -192,7 +210,6 @@ request(options, function (error, response) {
   if (error) throw new Error(error);
   console.log(response.body);
 });
-
 ```
 <br/>
 
@@ -201,13 +218,15 @@ request(options, function (error, response) {
 import requests
 import json
 
-url = "https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems"
+url = "https://ebay-sold-items-api.herokuapp.com/findCompletedItems"
 
 payload = json.dumps({
   "keywords": "iPhone",
-  "excluded_keywords": "locked cracked case box read LCD",
-  "max_search_results": "200",
+  "excluded_keywords": "locked cracked case box read LCD face",
+  "max_search_results": "240",
   "category_id": "9355",
+  "remove_outliers": True,
+  "site_id": "0",
   "aspects": [
     {
       "name": "Model",
@@ -223,7 +242,7 @@ payload = json.dumps({
     },
     {
       "name": "Storage Capacity",
-      "value": "64 GB"
+      "value": "256 GB"
     }
   ]
 })
