@@ -49,7 +49,7 @@ Returns all data for completed sales
 <br/>
 
 * **max_search_results**
-    * Description: Maximum amount of search results. **Only allowed values:** 25, 50, 100, 200
+    * Description: Maximum amount of search results. **Only allowed values:** 60, 120, 240
     * Example: 200,
     * Required: Yes
 <br/>
