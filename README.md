@@ -1,284 +1,253 @@
-<h3 align="center">eBay Completed Items API</h3>
+# eBay Completed Items API
 
+Retrieve data on recently sold eBay listings. Refine results by keywords, excluded phrases, category, aspects, and eBay territory. Returns pricing statistics (average, median, min, max) and detailed information on each sold product including price, currency, condition, buying format, and more.
 
----
+## Table of Contents
 
-<p align="center"> This API is used to receive data on recently sold eBay listings by scraping eBay.com
-Refine the request by filtering by keywords, excluded phrases, category, and aspect values. Aspect values are category-specific parameters used to search for more precise products. For example: model, condition, carrier, storage.
-You will receive the number of total results, the average price of all products searched for, the minimum price, the maximum price, and the price and more information on each individual product.
-    <br> 
-</p>
-
-## 📝 Table of Contents
-
-- [Getting Started](#getting_started)
+- [Getting Started](#getting-started)
 - [Routes](#routes)
-- [Code Examples](#code_examples)
+- [Parameters](#parameters)
+- [Site IDs](#site-ids)
+- [Response](#response)
+- [Code Examples](#code-examples)
 - [Troubleshooting](#troubleshooting)
-- [Built Using](#built_using)
 
+## Getting Started
 
-## 🏁 Getting Started <a name = "getting_started"></a>
-This API is a POST methods and requires body data.
+This API uses POST requests with JSON body data.
 
 ### Request URL
-The URL you will be getting data from
 
 ```
-POST https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems
+POST https://ebay-api.scrapechain.com/findCompletedItems
 ```
 
-## Routes <a name = "routes"></a>
+### Headers
 
-Returns all data for completed sales
 ```
-/findCompletedItems
+Content-Type: application/json
 ```
-### Request
 
-#### Headers
-* content-type: application/json
-* x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com
-* x-rapidapi-key: */*YOUR KEY/**
+## Routes
 
-#### Body Data
-* **keywords**
-    * Description: Keywords entered into the eBay searchbar to refine results. Seperated by spaces
-    * Example: "iPhone"
-    * Required: Yes
-<br/>
+### `/findCompletedItems`
 
-* **max_search_results**
-    * Description: Maximum amount of search results. **Only allowed values:** 60, 120, 240
-    * Example: 200,
-    * Required: Yes
-<br/>
+Returns completed/sold item data with pricing statistics.
 
-* **excluded_keywords**
-    * Description: Phrases you would like to exclude from the search. Seperated by spaces
-    * Example: "locked cracked case box read"
-    * Required: No
-<br/>
+## Parameters
 
-* **category_id**
-    * Description: A unique ID given to seperate categories of products on eBay. To find a category ID to use, navigate to: https://www.isoldwhat.com/
-    * Example: "9355" - Cell Phones & Smartphones
-    * Required: No (**HIGHLY RECOMMENDED**)
-<br/>
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `keywords` | string | Yes | - | Search keywords separated by spaces |
+| `max_search_results` | number | No | `60` | Maximum results. Allowed values: `60`, `120`, `240` |
+| `excluded_keywords` | string | No | - | Words to exclude from search, separated by spaces |
+| `category_id` | string | No | - | eBay category ID. Find IDs at [isoldwhat.com](https://www.isoldwhat.com/). **Highly recommended** for accurate results |
+| `remove_outliers` | boolean | No | `false` | Remove products with prices that are statistical outliers |
+| `site_id` | string | No | `"0"` | eBay territory site ID. See [Site IDs](#site-ids) below |
+| `aspects` | array | No | - | Category-specific filters. See [Aspects](#aspects) below |
 
-* **remove_outliers**
-    * Description: If set to true, it will remove all outliers with prices way too high or low from the results.
-    * Example: "false"
-    * Required: No
-<br/>
+### Aspects
 
-* **site_id**
-    * Description: The ebay site ID that eBay will use. Different terretories use different sites. 
-To find site ID values, navigate to: https://developer.ebay.com/devzone/finding/callref/Enums/GlobalIdList.html
-    * Example: "0" - United States
-    * Required: No - (defaults to "0")
-<br/>
+Aspects are category-specific filters matching eBay's sidebar filters (model, storage, condition, etc.). Each aspect requires a `name` and `value`.
 
+```json
+[
+    { "name": "Model", "value": "Apple iPhone X" },
+    { "name": "Storage Capacity", "value": "256 GB" }
+]
+```
 
+## Site IDs
 
-* **aspects**
-    * Description: A list of eBay aspects to help refile search results. For each aspect, the only allwoed parameters are: "name" and "value" and values for each are required. These aspects are the same as the filters you see on the eBay site when looking for spicific models or colors of products.
-    * Example: 
-    ```json
-    [
-        { 
-            "name": "Model", 
-            "value": "Apple iPhone X" 
-        },
-        {
-            "name": "Storage Capacity",
-            "value": "64 GB"
-        }
-    ]
-    ```
-    * Required: No
-<br/>
+Different eBay territories use different site IDs. Each territory has its own domain, currency, and locale.
 
-### Response
-#### Example
+| Site ID | Country | Domain | Currency |
+|---|---|---|---|
+| `0` | United States | ebay.com | USD |
+| `2` | Canada (English) | ebay.ca | C |
+| `3` | United Kingdom | ebay.co.uk | £ |
+| `15` | Australia | ebay.com.au | AU |
+| `16` | Austria | ebay.at | EUR |
+| `23` | Belgium (French) | befr.ebay.be | EUR |
+| `71` | France | ebay.fr | EUR |
+| `77` | Germany | ebay.de | EUR |
+| `101` | Italy | ebay.it | EUR |
+| `123` | Belgium (Dutch) | benl.ebay.be | EUR |
+| `146` | Netherlands | ebay.nl | EUR |
+| `186` | Spain | ebay.es | EUR |
+| `193` | Switzerland | ebay.ch | CHF |
+| `201` | Hong Kong | ebay.com.hk | HK$ |
+| `203` | Ireland | ebay.ie | EUR |
+| `205` | Ireland | ebay.ie | EUR |
+| `207` | Malaysia | ebay.com.my | RM |
+| `210` | Canada (French) | cafr.ebay.ca | $C |
+| `211` | Philippines | ebay.ph | PHP |
+| `212` | Poland | ebay.pl | zł |
+| `216` | Singapore | ebay.com.sg | S$ |
+
+## Response
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `success` | boolean | Whether the request was successful |
+| `average_price` | number | Average sale price across all results |
+| `median_price` | number | Median sale price |
+| `min_price` | number | Lowest sale price |
+| `max_price` | number | Highest sale price |
+| `results` | number | Number of products returned |
+| `total_results` | number | Total results found on eBay |
+| `response_url` | string | The eBay URL that was scraped |
+| `products` | array | Array of sold products |
+
+### Product Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | string | Listing title |
+| `sale_price` | number | Price the item sold for |
+| `currency` | string \| null | Currency symbol from the listing (e.g. `$`, `£`, `EUR`) |
+| `condition` | string | Item condition |
+| `buying_format` | string \| null | `"Auction"`, `"Buy It Now"`, or `"Accepts Offers"` |
+| `date_sold` | string | Date the item was sold |
+| `image_url` | string \| null | Product image URL |
+| `shipping_price` | number \| null | Shipping cost (`0` for free shipping) |
+| `link` | string | URL to the eBay listing |
+| `item_id` | string \| null | eBay item ID |
+
+### Example Response
+
 ```json
 {
     "success": true,
     "average_price": 226.47,
-    "median_price": 220.5,
+    "median_price": 220.50,
     "min_price": 149.99,
-    "max_price": 319,
+    "max_price": 319.00,
     "results": 189,
-    "response_url": "https://www.ebay.com/sch/9355/i.html?_nkw=iPhone+-locked+-cracked+-case+-box+-read+-LCD+-face&LH_Sold=1&LH_Complete=1&_ipg=240&Model=Apple%2520iPhone%2520X&LH_ItemCondition=3000&Network=Unlocked&Storage%2520Capacity=256%2520GB",
+    "total_results": 2400,
+    "response_url": "https://www.ebay.com/sch/9355/i.html?_nkw=iPhone&LH_Sold=1&LH_Complete=1&_ipg=240",
     "products": [
         {
-            "title": "Apple iPhone X - 256GB - (Unlocked)  - Works Great - (#8076)",
+            "title": "Apple iPhone X - 256GB - (Unlocked) - Works Great",
             "sale_price": 211.99,
+            "currency": "$",
+            "condition": "Pre-Owned",
+            "buying_format": "Buy It Now",
             "date_sold": "Jun 11, 2022",
-            "link": "https://www.ebay.com/itm/185450226888?hash=item2b2db1e4c8%3Ag%3AEmwAAOSw8DJierSB&LH_ItemCondition=3000"
+            "image_url": "https://i.ebayimg.com/images/g/.../s-l500.jpg",
+            "shipping_price": 0,
+            "link": "https://www.ebay.com/itm/185450226888",
+            "item_id": "185450226888"
         },
         {
-            "title": "Apple iPhone X 256GB Unlocked Silver White A1901 iOS 13.6",
-            "sale_price": 269,
+            "title": "Apple iPhone X 256GB Unlocked Silver White",
+            "sale_price": 269.00,
+            "currency": "$",
+            "condition": "Pre-Owned",
+            "buying_format": "Auction",
             "date_sold": "Jun 11, 2022",
-            "link": "https://www.ebay.com/itm/115419688300?epid=239160803&hash=item1adf8cad6c%3Ag%3ASQkAAOSwUWRiiTwo&LH_ItemCondition=3000"
-        },
-        {
-            "title": "Apple iPhone X GSM Smartphone - Space Gray/256GB/Unlocked",
-            "sale_price": 207.5,
-            "date_sold": "Jun 11, 2022",
-            "link": "https://www.ebay.com/itm/394105212129?epid=28039771047&hash=item5bc2804ce1%3Ag%3AGusAAOSw-cpinkmi&LH_ItemCondition=3000"
-        },
-        ...
+            "image_url": "https://i.ebayimg.com/images/g/.../s-l500.jpg",
+            "shipping_price": 5.99,
+            "link": "https://www.ebay.com/itm/115419688300",
+            "item_id": "115419688300"
+        }
     ]
+}
 ```
 
+## Code Examples
 
-## Code Examples <a name = "code_examples"></a>
+### cURL
 
-##### cURL
-```curl
-curl --location --request POST 'https://ebay-sold-items-api.herokuapp.com/findCompletedItems' \
---header 'Content-Type: application/json' \
---data-raw '{
+```bash
+curl -X POST 'https://ebay-api.scrapechain.com/findCompletedItems' \
+  -H 'Content-Type: application/json' \
+  -d '{
     "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read LCD face",
-    "max_search_results": "240",
+    "excluded_keywords": "locked cracked case box read",
+    "max_search_results": 240,
     "category_id": "9355",
     "remove_outliers": true,
     "site_id": "0",
     "aspects": [
-        {
-            "name": "Model",
-            "value": "Apple iPhone X"
-        },
-        {
-            "name": "LH_ItemCondition",
-            "value": "3000"
-        },
-        {
-            "name": "Network",
-            "value": "Unlocked"
-        },
-        {
-            "name": "Storage Capacity",
-            "value": "256 GB"
-        }
+        { "name": "Model", "value": "Apple iPhone X" },
+        { "name": "LH_ItemCondition", "value": "3000" },
+        { "name": "Network", "value": "Unlocked" },
+        { "name": "Storage Capacity", "value": "256 GB" }
     ]
 }'
 ```
-<br/>
 
-##### NodeJS - Request
-```javascript
-var request = require('request');
-var options = {
-  'method': 'POST',
-  'url': 'https://ebay-sold-items-api.herokuapp.com/findCompletedItems',
-  'headers': {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read LCD face",
-    "max_search_results": "240",
-    "category_id": "9355",
-    "remove_outliers": true,
-    "site_id": "0",
-    "aspects": [
-      {
-        "name": "Model",
-        "value": "Apple iPhone X"
-      },
-      {
-        "name": "LH_ItemCondition",
-        "value": "3000"
-      },
-      {
-        "name": "Network",
-        "value": "Unlocked"
-      },
-      {
-        "name": "Storage Capacity",
-        "value": "256 GB"
-      }
-    ]
-  })
+### Python
 
-};
-request(options, function (error, response) {
-  if (error) throw new Error(error);
-  console.log(response.body);
-});
-```
-<br/>
-
-##### Python - Requests
 ```python
 import requests
-import json
 
-url = "https://ebay-sold-items-api.herokuapp.com/findCompletedItems"
+url = "https://ebay-api.scrapechain.com/findCompletedItems"
 
-payload = json.dumps({
-  "keywords": "iPhone",
-  "excluded_keywords": "locked cracked case box read LCD face",
-  "max_search_results": "240",
-  "category_id": "9355",
-  "remove_outliers": True,
-  "site_id": "0",
-  "aspects": [
-    {
-      "name": "Model",
-      "value": "Apple iPhone X"
-    },
-    {
-      "name": "LH_ItemCondition",
-      "value": "3000"
-    },
-    {
-      "name": "Network",
-      "value": "Unlocked"
-    },
-    {
-      "name": "Storage Capacity",
-      "value": "256 GB"
-    }
-  ]
+response = requests.post(url, json={
+    "keywords": "iPhone",
+    "excluded_keywords": "locked cracked case box read",
+    "max_search_results": 240,
+    "category_id": "9355",
+    "remove_outliers": True,
+    "site_id": "0",
+    "aspects": [
+        {"name": "Model", "value": "Apple iPhone X"},
+        {"name": "LH_ItemCondition", "value": "3000"},
+        {"name": "Network", "value": "Unlocked"},
+        {"name": "Storage Capacity", "value": "256 GB"}
+    ]
 })
-headers = {
-  'Content-Type': 'application/json'
-}
 
-response = requests.request("POST", url, headers=headers, data=payload)
-
-print(response.text)
+print(response.json())
 ```
 
+### JavaScript (axios)
 
-## 🔧 Troubleshooting <a name = "troubleshooting"></a>
+```javascript
+const axios = require('axios');
 
-#### Long request time
-If you've noticed that every once in a while your requests will take well over 10 seconds, there is a reason for that. eBay requires a captcha to be solved every few hours when requesting data for sold items. When our server detects a captcha is required, it will automatically solve it and send you the results for the data once it is available, but this can take a few seconds to complete. A captcha is only required once every few hours, but should not affect the success rate or results of the data.
+const response = await axios.post('https://ebay-api.scrapechain.com/findCompletedItems', {
+    keywords: 'iPhone',
+    excluded_keywords: 'locked cracked case box read',
+    max_search_results: 240,
+    category_id: '9355',
+    remove_outliers: true,
+    site_id: '0',
+    aspects: [
+        { name: 'Model', value: 'Apple iPhone X' },
+        { name: 'LH_ItemCondition', value: '3000' },
+        { name: 'Network', value: 'Unlocked' },
+        { name: 'Storage Capacity', value: '256 GB' }
+    ]
+});
 
-#### Aspects
-Some aspects on eBay have a different url value then what is shown on the site. If the aspect is not working, make sure that aspect can be used with the category you have selected. Then visit the response_url and select the aspect you want shown. Navigate to the url bar and look for a substring where the new aspect was updated. For example eBay shows "condition" as one of the aspect names, but the actual value in the url is "LH_ItemCondition", and the valeus are condition id's and not condition names.
+console.log(response.data);
+```
 
-#### Conditions
-Conditions on eBay have correlated ids. These ids can be found here: https://developer.ebay.com/devzone/finding/callref/enums/conditionIdList.html
-Not all conditions work for every category. Make sure you visit the response_url to see what aspects you can use.
+## Troubleshooting
 
-#### Anything else
-Reach out to us through RapidAPI and we will update our API and help you with anything.
+### Aspects not working
 
+Some eBay aspects have a different URL value than what is shown on the site. If an aspect is not working:
 
-## ⛏️ Built Using <a name = "built_using"></a>
-- [Express](https://expressjs.com/) - Server Framework
-- [NodeJs](https://nodejs.org/en/) - Server Environment
-- [Axios](https://axios-http.com) - Server Requests
-- [Cheerio](https://cheerio.js.org/) - HTML Parsing
-- [Puppeteer](https://www.npmjs.com/package/puppeteer) - Browser Automation
+1. Make sure the aspect is available for the category you selected
+2. Visit the `response_url` from your API response
+3. Select the aspect filter you want on eBay's site
+4. Check the URL bar for the actual parameter name (e.g. eBay shows "Condition" but the URL uses `LH_ItemCondition`)
 
-## ✍️ Authors <a name = "authors"></a>
-- [@colindaniels](https://github.com/colindaniels) - Idea & All Work
+### Conditions
 
+Conditions on eBay use numeric IDs. Common values:
+
+- `1000` - New
+- `1500` - Open Box
+- `2000` - Refurbished
+- `2500` - Seller Refurbished
+- `3000` - Used
+- `7000` - For Parts
+
+Use these as aspect values: `{ "name": "LH_ItemCondition", "value": "3000" }`
