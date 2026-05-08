@@ -14,18 +14,24 @@ Retrieve data on recently sold eBay listings. Refine results by keywords, exclud
 
 ## Getting Started
 
-This API uses POST requests with JSON body data.
+This API is distributed through RapidAPI. Subscribe to a plan to get an API key:
+
+[https://rapidapi.com/ecommet/api/ebay-average-selling-price/playground](https://rapidapi.com/ecommet/api/ebay-average-selling-price/playground)
+
+All requests are POST with a JSON body.
 
 ### Request URL
 
 ```
-POST https://ebay-api.scrapechain.com/findCompletedItems
+POST https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems
 ```
 
 ### Headers
 
 ```
 Content-Type: application/json
+x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com
+x-rapidapi-key: YOUR_RAPIDAPI_KEY
 ```
 
 ## Routes
@@ -162,8 +168,10 @@ Different eBay territories use different site IDs. Each territory has its own do
 ### cURL
 
 ```bash
-curl -X POST 'https://ebay-api.scrapechain.com/findCompletedItems' \
+curl -X POST 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems' \
   -H 'Content-Type: application/json' \
+  -H 'x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com' \
+  -H 'x-rapidapi-key: YOUR_RAPIDAPI_KEY' \
   -d '{
     "keywords": "iPhone",
     "excluded_keywords": "locked cracked case box read",
@@ -185,9 +193,15 @@ curl -X POST 'https://ebay-api.scrapechain.com/findCompletedItems' \
 ```python
 import requests
 
-url = "https://ebay-api.scrapechain.com/findCompletedItems"
+url = "https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems"
 
-response = requests.post(url, json={
+headers = {
+    "Content-Type": "application/json",
+    "x-rapidapi-host": "ebay-average-selling-price.p.rapidapi.com",
+    "x-rapidapi-key": "YOUR_RAPIDAPI_KEY",
+}
+
+response = requests.post(url, headers=headers, json={
     "keywords": "iPhone",
     "excluded_keywords": "locked cracked case box read",
     "max_search_results": 240,
@@ -210,20 +224,30 @@ print(response.json())
 ```javascript
 const axios = require('axios');
 
-const response = await axios.post('https://ebay-api.scrapechain.com/findCompletedItems', {
-    keywords: 'iPhone',
-    excluded_keywords: 'locked cracked case box read',
-    max_search_results: 240,
-    category_id: '9355',
-    remove_outliers: true,
-    site_id: '0',
-    aspects: [
-        { name: 'Model', value: 'Apple iPhone X' },
-        { name: 'LH_ItemCondition', value: '3000' },
-        { name: 'Network', value: 'Unlocked' },
-        { name: 'Storage Capacity', value: '256 GB' }
-    ]
-});
+const response = await axios.post(
+    'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems',
+    {
+        keywords: 'iPhone',
+        excluded_keywords: 'locked cracked case box read',
+        max_search_results: 240,
+        category_id: '9355',
+        remove_outliers: true,
+        site_id: '0',
+        aspects: [
+            { name: 'Model', value: 'Apple iPhone X' },
+            { name: 'LH_ItemCondition', value: '3000' },
+            { name: 'Network', value: 'Unlocked' },
+            { name: 'Storage Capacity', value: '256 GB' }
+        ]
+    },
+    {
+        headers: {
+            'Content-Type': 'application/json',
+            'x-rapidapi-host': 'ebay-average-selling-price.p.rapidapi.com',
+            'x-rapidapi-key': 'YOUR_RAPIDAPI_KEY',
+        }
+    }
+);
 
 console.log(response.data);
 ```
@@ -251,3 +275,5 @@ Conditions on eBay use numeric IDs. Common values:
 - `7000` - For Parts
 
 Use these as aspect values: `{ "name": "LH_ItemCondition", "value": "3000" }`
+
+Full list: [eBay Condition IDs](https://developer.ebay.com/devzone/finding/callref/enums/conditionIdList.html)
