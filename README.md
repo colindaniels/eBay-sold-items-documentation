@@ -139,6 +139,38 @@ marketplace, so pass the same `site` you will search with.
 }
 ```
 
+## Coming from RapidAPI?
+
+The eBay API is also published on RapidAPI as "eBay Average Selling Price"
+(host: `ebay-average-selling-price.p.rapidapi.com`). If you are integrating
+through RapidAPI:
+
+- **Use `GET /search` — NOT the legacy `/findCompletedItems` endpoint.**
+  Both return sold items only; /search is simply the current contract.
+  /findCompletedItems exists solely for old subscribers and should not be used
+  in new code.
+- /search on RapidAPI takes the **same query parameters documented above** and
+  returns the same response shape.
+- Auth differs: RapidAPI uses its own headers instead of `x-api-key`:
+  `x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com` and
+  `x-rapidapi-key: <your RapidAPI key>`.
+
+Example RapidAPI request:
+
+```bash
+curl "https://ebay-average-selling-price.p.rapidapi.com/search?query=battery+health&exclude=broken+cracked&category=9355&min_price=50&max_price=200&date_from=2026-05-26&date_to=2026-07-26&page=1&limit=240&site=EBAY_US" \
+  -H "x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com" \
+  -H "x-rapidapi-key: $RAPIDAPI_KEY"
+```
+
+The same API is available directly from trawl — better per-request pricing
+than the RapidAPI listing, support from the team that runs the API, and the
+plans and rate-limit headers described in this document. Updates and fixes
+ship to trawl first, then to RapidAPI. Existing RapidAPI integrations keep
+working; migrating is a base URL and auth header change: sign up at
+https://trawl.dev/signup, then call
+`https://api.trawl.dev/ebay/v1/search` with an `x-api-key` header.
+
 ## More APIs
 
 More APIs land under the same base URL, key, and request pool — this file is
