@@ -1,279 +1,146 @@
-# eBay Completed Items API
+# trawl — API reference (LLM-readable)
 
-Retrieve data on recently sold eBay listings. Refine results by keywords, excluded phrases, category, aspects, and eBay territory. Returns pricing statistics (average, median, min, max) and detailed information on each sold product including price, currency, condition, buying format, and more.
+Premium data APIs for developers. Plain HTTPS: send a request with an API key,
+get typed JSON back. This file is the complete reference, maintained for
+agents. Human docs: https://trawl.dev/docs · Agent skill:
+https://trawl.dev/agent-setup/SKILL.md
 
-## Table of Contents
+## Authentication
 
-- [Getting Started](#getting-started)
-- [Routes](#routes)
-- [Parameters](#parameters)
-- [Site IDs](#site-ids)
-- [Response](#response)
-- [Code Examples](#code-examples)
-- [Troubleshooting](#troubleshooting)
+- Every request needs an API key in the `x-api-key` header (header names are
+  case-insensitive). Keys look like `sk_live_…` and are account-wide: one key
+  works on every trawl API.
+- Users create keys at https://trawl.dev/console/keys (account signup:
+  https://trawl.dev/signup — email code, no credit card).
+- NEVER invent, guess, or hard-code a key. Keep it in an environment variable
+  and call the API from a backend — never from client-side code, and never in
+  a query string (query strings end up in logs and Referer headers).
 
-## Getting Started
+## Usage & limits
 
-This API is distributed through RapidAPI. Subscribe to a plan to get an API key:
+- Every plan includes a monthly request allowance shared across ALL trawl APIs
+  — one pool. Plans: https://trawl.dev/pricing
+- Only successful (2xx) responses count against the allowance. Errors are free.
+- The window resets on the first of each calendar month (UTC).
+- Every response reports standing via headers: `X-RateLimit-Limit`,
+  `X-RateLimit-Remaining`, `X-RateLimit-Reset` (Unix timestamp).
+- When the allowance is spent, requests return 429 until the reset. Do not
+  retry-loop a 429 — surface it to the user (upgrades:
+  https://trawl.dev/console/billing).
 
-[https://rapidapi.com/ecommet/api/ebay-average-selling-price/playground](https://rapidapi.com/ecommet/api/ebay-average-selling-price/playground)
+## Errors
 
-All requests are POST with a JSON body.
-
-### Request URL
-
-```
-POST https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems
-```
-
-### Headers
-
-```
-Content-Type: application/json
-x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com
-x-rapidapi-key: YOUR_RAPIDAPI_KEY
-```
-
-## Routes
-
-### `/findCompletedItems`
-
-Returns completed/sold item data with pricing statistics.
-
-## Parameters
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `keywords` | string | Yes | - | Search keywords separated by spaces |
-| `max_search_results` | number | No | `60` | Maximum results. Allowed values: `60`, `120`, `240` |
-| `excluded_keywords` | string | No | - | Words to exclude from search, separated by spaces |
-| `category_id` | string | No | - | eBay category ID. Find IDs at [isoldwhat.com](https://www.isoldwhat.com/). **Highly recommended** for accurate results |
-| `remove_outliers` | boolean | No | `false` | Remove products with prices that are statistical outliers |
-| `site_id` | string | No | `"0"` | eBay territory site ID. See [Site IDs](#site-ids) below |
-| `aspects` | array | No | - | Category-specific filters. See [Aspects](#aspects) below |
-
-### Aspects
-
-Aspects are category-specific filters matching eBay's sidebar filters (model, storage, condition, etc.). Each aspect requires a `name` and `value`.
+Non-2xx responses return JSON with a single field:
 
 ```json
-[
-    { "name": "Model", "value": "Apple iPhone X" },
-    { "name": "Storage Capacity", "value": "256 GB" }
-]
+{ "error": "min_price must be <= max_price" }
 ```
 
-## Site IDs
+| Status | Meaning |
+| --- | --- |
+| 400 | A parameter failed validation — the message names the field and rule. |
+| 403 | Missing, invalid, or deleted API key. |
+| 404 | Nothing found — an unknown path or resource. |
+| 429 | Monthly allowance spent. Wait for X-RateLimit-Reset or upgrade. |
+| 500 | Internal error on trawl's side. |
+| 503 | Search backend temporarily unavailable — safe to retry with backoff. |
 
-Different eBay territories use different site IDs. Each territory has its own domain, currency, and locale.
+## eBay API
 
-| Site ID | Country | Domain | Currency |
-|---|---|---|---|
-| `0` | United States | ebay.com | USD |
-| `2` | Canada (English) | ebay.ca | C |
-| `3` | United Kingdom | ebay.co.uk | £ |
-| `15` | Australia | ebay.com.au | AU |
-| `16` | Austria | ebay.at | EUR |
-| `23` | Belgium (French) | befr.ebay.be | EUR |
-| `71` | France | ebay.fr | EUR |
-| `77` | Germany | ebay.de | EUR |
-| `101` | Italy | ebay.it | EUR |
-| `123` | Belgium (Dutch) | benl.ebay.be | EUR |
-| `146` | Netherlands | ebay.nl | EUR |
-| `186` | Spain | ebay.es | EUR |
-| `193` | Switzerland | ebay.ch | CHF |
-| `201` | Hong Kong | ebay.com.hk | HK$ |
-| `203` | Ireland | ebay.ie | EUR |
-| `205` | Ireland | ebay.ie | EUR |
-| `207` | Malaysia | ebay.com.my | RM |
-| `210` | Canada (French) | cafr.ebay.ca | $C |
-| `211` | Philippines | ebay.ph | PHP |
-| `212` | Poland | ebay.pl | zł |
-| `216` | Singapore | ebay.com.sg | S$ |
+Base URL: `https://api.trawl.dev/ebay/v1`
 
-## Response
+Sold-listings data: search 80+ million real completed eBay sales across the US
+and UK marketplaces — final price, sale date, condition and shipping for every
+item that actually sold. eBay itself only exposes ~90 days of sold history;
+this keeps the history and adds query controls.
 
-### Fields
+### GET /search
 
-| Field | Type | Description |
-|---|---|---|
-| `success` | boolean | Whether the request was successful |
-| `average_price` | number | Average sale price across all results |
-| `median_price` | number | Median sale price |
-| `min_price` | number | Lowest sale price |
-| `max_price` | number | Highest sale price |
-| `results` | number | Number of products returned |
-| `total_results` | number | Total results found on eBay |
-| `response_url` | string | The eBay URL that was scraped |
-| `products` | array | Array of sold products |
+Finds sold listings whose title contains EVERY word in `query`, in any order
+(eBay's own matching semantics). Results are always newest-first; there is no
+sort parameter.
 
-### Product Fields
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| query | string | yes | Words that must all appear in the listing title, in any order. |
+| site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
+| exclude | string | no | Words that must NOT appear in the title. Must not overlap query. |
+| category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. |
+| min_price | number | no | Minimum sale price. Must be <= max_price when both set. |
+| max_price | number | no | Maximum sale price. |
+| condition | string | no | Comma-separated buckets: new, new_other, open_box, used, refurbished, parts, unknown. |
+| date_from | string | no | Earliest sale date, inclusive, YYYY-MM-DD. |
+| date_to | string | no | Latest sale date, inclusive, YYYY-MM-DD. |
+| limit | number | no | Results per page, 1–240. Default 240. |
+| page | number | no | Page number, 1–50. page × limit is capped at 15,000. |
 
-| Field | Type | Description |
-|---|---|---|
-| `title` | string | Listing title |
-| `sale_price` | number | Price the item sold for |
-| `currency` | string \| null | Currency symbol from the listing (e.g. `$`, `£`, `EUR`) |
-| `condition` | string | Item condition |
-| `buying_format` | string \| null | `"Auction"`, `"Buy It Now"`, or `"Accepts Offers"` |
-| `date_sold` | string | Date the item was sold |
-| `image_url` | string \| null | Product image URL |
-| `shipping_price` | number \| null | Shipping cost (`0` for free shipping) |
-| `link` | string | URL to the eBay listing |
-| `item_id` | string \| null | eBay item ID |
+Example:
 
-### Example Response
+```bash
+curl "https://api.trawl.dev/ebay/v1/search?query=iphone+15+pro+256gb&condition=used&limit=240" \
+  -H "x-api-key: $TRAWL_KEY"
+```
+
+Response shape (one result shown):
 
 ```json
 {
-    "success": true,
-    "average_price": 226.47,
-    "median_price": 220.50,
-    "min_price": 149.99,
-    "max_price": 319.00,
-    "results": 189,
-    "total_results": 2400,
-    "response_url": "https://www.ebay.com/sch/9355/i.html?_nkw=iPhone&LH_Sold=1&LH_Complete=1&_ipg=240",
-    "products": [
-        {
-            "title": "Apple iPhone X - 256GB - (Unlocked) - Works Great",
-            "sale_price": 211.99,
-            "currency": "$",
-            "condition": "Pre-Owned",
-            "buying_format": "Buy It Now",
-            "date_sold": "Jun 11, 2022",
-            "image_url": "https://i.ebayimg.com/images/g/.../s-l500.jpg",
-            "shipping_price": 0,
-            "link": "https://www.ebay.com/itm/185450226888",
-            "item_id": "185450226888"
-        },
-        {
-            "title": "Apple iPhone X 256GB Unlocked Silver White",
-            "sale_price": 269.00,
-            "currency": "$",
-            "condition": "Pre-Owned",
-            "buying_format": "Auction",
-            "date_sold": "Jun 11, 2022",
-            "image_url": "https://i.ebayimg.com/images/g/.../s-l500.jpg",
-            "shipping_price": 5.99,
-            "link": "https://www.ebay.com/itm/115419688300",
-            "item_id": "115419688300"
-        }
-    ]
-}
-```
-
-## Code Examples
-
-### cURL
-
-```bash
-curl -X POST 'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems' \
-  -H 'Content-Type: application/json' \
-  -H 'x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com' \
-  -H 'x-rapidapi-key: YOUR_RAPIDAPI_KEY' \
-  -d '{
-    "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read",
-    "max_search_results": 240,
-    "category_id": "9355",
-    "remove_outliers": true,
-    "site_id": "0",
-    "aspects": [
-        { "name": "Model", "value": "Apple iPhone X" },
-        { "name": "LH_ItemCondition", "value": "3000" },
-        { "name": "Network", "value": "Unlocked" },
-        { "name": "Storage Capacity", "value": "256 GB" }
-    ]
-}'
-```
-
-### Python
-
-```python
-import requests
-
-url = "https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems"
-
-headers = {
-    "Content-Type": "application/json",
-    "x-rapidapi-host": "ebay-average-selling-price.p.rapidapi.com",
-    "x-rapidapi-key": "YOUR_RAPIDAPI_KEY",
-}
-
-response = requests.post(url, headers=headers, json={
-    "keywords": "iPhone",
-    "excluded_keywords": "locked cracked case box read",
-    "max_search_results": 240,
-    "category_id": "9355",
-    "remove_outliers": True,
-    "site_id": "0",
-    "aspects": [
-        {"name": "Model", "value": "Apple iPhone X"},
-        {"name": "LH_ItemCondition", "value": "3000"},
-        {"name": "Network", "value": "Unlocked"},
-        {"name": "Storage Capacity", "value": "256 GB"}
-    ]
-})
-
-print(response.json())
-```
-
-### JavaScript (axios)
-
-```javascript
-const axios = require('axios');
-
-const response = await axios.post(
-    'https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems',
+  "site": "EBAY_US",
+  "currency": "USD",
+  "query": ["iphone", "15", "pro"],
+  "filters": { "condition": ["used"] },
+  "page": 1,
+  "count": 240,
+  "took_ms": 41,
+  "results": [
     {
-        keywords: 'iPhone',
-        excluded_keywords: 'locked cracked case box read',
-        max_search_results: 240,
-        category_id: '9355',
-        remove_outliers: true,
-        site_id: '0',
-        aspects: [
-            { name: 'Model', value: 'Apple iPhone X' },
-            { name: 'LH_ItemCondition', value: '3000' },
-            { name: 'Network', value: 'Unlocked' },
-            { name: 'Storage Capacity', value: '256 GB' }
-        ]
-    },
-    {
-        headers: {
-            'Content-Type': 'application/json',
-            'x-rapidapi-host': 'ebay-average-selling-price.p.rapidapi.com',
-            'x-rapidapi-key': 'YOUR_RAPIDAPI_KEY',
-        }
+      "item_id": "256637082114",
+      "title": "Apple iPhone 15 Pro 256GB Unlocked",
+      "sale_price": 525.00,
+      "shipping_price": 0,
+      "currency": "$",
+      "condition": "Pre-Owned",
+      "condition_normalized": "used",
+      "buying_format": "Buy It Now",
+      "date_sold": "2026-07-18T00:00:00.000Z",
+      "item_link": "https://www.ebay.com/itm/256637082114",
+      "image_url": "https://i.ebayimg.com/images/g/abc/s-l500.webp",
+      "location": "United States",
+      "seller_name": "techresale",
+      "seller_feedback_count": 1842,
+      "seller_feedback_percent": 99.6,
+      "categoryId": "9355"
     }
-);
-
-console.log(response.data);
+  ]
+}
 ```
 
-## Troubleshooting
+### GET /categories
 
-### Aspects not working
+Look up eBay leaf categories by name, busiest first — use the returned
+`categoryId` as the `category` filter on /search. Category ids differ per
+marketplace, so pass the same `site` you will search with.
 
-Some eBay aspects have a different URL value than what is shown on the site. If an aspect is not working:
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| query | string | yes | Category name to search for. Case- and accent-insensitive. |
+| site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
 
-1. Make sure the aspect is available for the category you selected
-2. Visit the `response_url` from your API response
-3. Select the aspect filter you want on eBay's site
-4. Check the URL bar for the actual parameter name (e.g. eBay shows "Condition" but the URL uses `LH_ItemCondition`)
+```json
+{
+  "site": "EBAY_US",
+  "total": 3,
+  "count": 3,
+  "categories": [
+    { "categoryId": "183454", "name": "Pokémon TCG Cards", "group": "Toys & Hobbies" },
+    { "categoryId": "2611", "name": "Pokémon Mixed Card Lots", "group": "Toys & Hobbies" },
+    { "categoryId": "183466", "name": "Pokémon Sealed Boosters", "group": "Toys & Hobbies" }
+  ]
+}
+```
 
-### Conditions
+## More APIs
 
-Conditions on eBay use numeric IDs. Common values:
-
-- `1000` - New
-- `1500` - Open Box
-- `2000` - Refurbished
-- `2500` - Seller Refurbished
-- `3000` - Used
-- `7000` - For Parts
-
-Use these as aspect values: `{ "name": "LH_ItemCondition", "value": "3000" }`
-
-Full list: [eBay Condition IDs](https://developer.ebay.com/devzone/finding/callref/enums/conditionIdList.html)
+More APIs land under the same base URL, key, and request pool — this file is
+updated as they ship. Users can request and vote on new data sources in the
+roadmap section at https://trawl.dev.
