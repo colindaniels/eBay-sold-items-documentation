@@ -19,14 +19,20 @@ https://trawl.dev/agent-setup/SKILL.md
 ## Usage & limits
 
 - Every plan includes a monthly request allowance shared across ALL trawl APIs
-  — one pool. Plans: https://trawl.dev/pricing
-- Only successful (2xx) responses count against the allowance. Errors are free.
-- The window resets on the first of each calendar month (UTC).
+  — one pool — plus a per-second request rate. Plans: https://trawl.dev/pricing
+- Only successful (2xx) responses count against the allowance, and errors
+  don't count toward the rate either. Errors are free.
+- The window follows the account's billing cycle: it resets when the
+  subscription starts, renews, or changes plan. Free accounts reset on the
+  first of each calendar month (UTC). Spending the whole allowance as fast as
+  the rate allows is fine — there is no other throttle.
 - Every response reports standing via headers: `X-RateLimit-Limit`,
-  `X-RateLimit-Remaining`, `X-RateLimit-Reset` (Unix timestamp).
-- When the allowance is spent, requests return 429 until the reset. Do not
-  retry-loop a 429 — surface it to the user (upgrades:
-  https://trawl.dev/console/billing).
+  `X-RateLimit-Remaining`, `X-RateLimit-Reset` (Unix timestamp of the
+  window's end).
+- A 429 means one of two things. With a `Retry-After` header: the per-second
+  rate was exceeded — wait that many seconds and retry (costs nothing). Without
+  `Retry-After`: the monthly allowance is spent — do NOT retry-loop; surface
+  it to the user (upgrades: https://trawl.dev/console/billing).
 
 ## Errors
 
@@ -41,7 +47,7 @@ Non-2xx responses return JSON with a single field:
 | 400 | A parameter failed validation — the message names the field and rule. |
 | 403 | Missing, invalid, or deleted API key. |
 | 404 | Nothing found — an unknown path or resource. |
-| 429 | Monthly allowance spent. Wait for X-RateLimit-Reset or upgrade. |
+| 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly allowance spent — wait for X-RateLimit-Reset or upgrade. Never billed. |
 | 500 | Internal error on trawl's side. |
 | 503 | Search backend temporarily unavailable — safe to retry with backoff. |
 
@@ -54,7 +60,7 @@ and UK marketplaces — final price, sale date, condition and shipping for every
 item that actually sold. eBay itself only exposes ~90 days of sold history;
 this keeps the history and adds query controls.
 
-### GET /search
+### GET /sold
 
 Finds sold listings whose title contains EVERY word in `query`, in any order
 (eBay's own matching semantics). Results are always newest-first; there is no
@@ -77,7 +83,7 @@ sort parameter.
 Example:
 
 ```bash
-curl "https://api.trawl.dev/ebay/v1/search?query=iphone+15+pro+256gb&condition=used&limit=240" \
+curl "https://api.trawl.dev/ebay/v1/sold?query=iphone+15+pro+256gb&condition=used&limit=240" \
   -H "x-api-key: $TRAWL_KEY"
 ```
 
@@ -118,58 +124,35 @@ Response shape (one result shown):
 ### GET /categories
 
 Look up eBay leaf categories by name, busiest first — use the returned
-`categoryId` as the `category` filter on /search. Category ids differ per
+`categoryId` as the `category` filter on /sold. Category ids differ per
 marketplace, so pass the same `site` you will search with.
+
+Matching covers the category's full path, not just its own name — "collectible
+card games" finds every CCG leaf. Note that eBay's taxonomy has NO per-brand or
+per-sport categories: Pokémon or baseball cards live under generic categories
+like `183454` (CCG Individual Cards) or `261328` (Trading Card Singles), with
+the game/sport as a listing attribute. To narrow to a brand, combine the
+generic `category` id with brand words in `query` on /sold.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| query | string | yes | Category name to search for. Case- and accent-insensitive. |
+| query | string | yes | Words to match against category names and their parent path — every word must appear, in any order. Case- and accent-insensitive. A numeric query is an id lookup instead: it returns that exact category (with a `leaf` flag — only leaf ids work as the /sold category filter). |
 | site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
 
 ```json
 {
   "site": "EBAY_US",
-  "total": 3,
-  "count": 3,
+  "total": 38,
+  "count": 5,
   "categories": [
-    { "categoryId": "183454", "name": "Pokémon TCG Cards", "group": "Toys & Hobbies" },
-    { "categoryId": "2611", "name": "Pokémon Mixed Card Lots", "group": "Toys & Hobbies" },
-    { "categoryId": "183466", "name": "Pokémon Sealed Boosters", "group": "Toys & Hobbies" }
+    { "categoryId": "261328", "name": "Trading Card Singles", "group": "Sports Mem, Cards & Fan Shop" },
+    { "categoryId": "183050", "name": "Trading Card Singles", "group": "Collectibles" },
+    { "categoryId": "261329", "name": "Trading Card Lots", "group": "Sports Mem, Cards & Fan Shop" },
+    { "categoryId": "261332", "name": "Sealed Trading Card Boxes", "group": "Sports Mem, Cards & Fan Shop" },
+    { "categoryId": "261330", "name": "Trading Card Sets", "group": "Sports Mem, Cards & Fan Shop" }
   ]
 }
 ```
-
-## Coming from RapidAPI?
-
-The eBay API is also published on RapidAPI as "eBay Average Selling Price"
-(host: `ebay-average-selling-price.p.rapidapi.com`). If you are integrating
-through RapidAPI:
-
-- **Use `GET /search` — NOT the legacy `/findCompletedItems` endpoint.**
-  Both return sold items only; /search is simply the current contract.
-  /findCompletedItems exists solely for old subscribers and should not be used
-  in new code.
-- /search on RapidAPI takes the **same query parameters documented above** and
-  returns the same response shape.
-- Auth differs: RapidAPI uses its own headers instead of `x-api-key`:
-  `x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com` and
-  `x-rapidapi-key: <your RapidAPI key>`.
-
-Example RapidAPI request:
-
-```bash
-curl "https://ebay-average-selling-price.p.rapidapi.com/search?query=battery+health&exclude=broken+cracked&category=9355&min_price=50&max_price=200&date_from=2026-05-26&date_to=2026-07-26&page=1&limit=240&site=EBAY_US" \
-  -H "x-rapidapi-host: ebay-average-selling-price.p.rapidapi.com" \
-  -H "x-rapidapi-key: $RAPIDAPI_KEY"
-```
-
-The same API is available directly from trawl — better per-request pricing
-than the RapidAPI listing, support from the team that runs the API, and the
-plans and rate-limit headers described in this document. Updates and fixes
-ship to trawl first, then to RapidAPI. Existing RapidAPI integrations keep
-working; migrating is a base URL and auth header change: sign up at
-https://trawl.dev/signup, then call
-`https://api.trawl.dev/ebay/v1/search` with an `x-api-key` header.
 
 ## More APIs
 
