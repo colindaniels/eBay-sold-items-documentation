@@ -74,7 +74,7 @@ sort parameter.
 | category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. |
 | min_price | number | no | Minimum sale price. Must be <= max_price when both set. |
 | max_price | number | no | Maximum sale price. |
-| condition | string | no | Comma-separated buckets: new, new_other, open_box, used, refurbished, parts, unknown. |
+| condition | string | no | Comma-separated: new, used, parts, other. Matches the `condition` field in results; the listing's verbatim string is returned separately as `condition_raw`. |
 | date_from | string | no | Earliest sale date, inclusive, YYYY-MM-DD. |
 | date_to | string | no | Latest sale date, inclusive, YYYY-MM-DD. |
 | limit | number | no | Results per page, 1–240. Default 240. |
@@ -100,22 +100,19 @@ Response shape (one result shown):
   "took_ms": 41,
   "results": [
     {
-      "item_id": "256637082114",
       "title": "Apple iPhone 15 Pro 256GB Unlocked",
       "sale_price": 525.00,
       "shipping_price": 0,
       "currency": "$",
-      "condition": "Pre-Owned",
-      "condition_normalized": "used",
-      "buying_format": "Buy It Now",
+      "condition": "used",
+      "condition_raw": "Pre-Owned",
       "date_sold": "2026-07-18T00:00:00.000Z",
-      "item_link": "https://www.ebay.com/itm/256637082114",
-      "image_url": "https://i.ebayimg.com/images/g/abc/s-l500.webp",
+      "buying_format": "Buy It Now",
       "location": "United States",
-      "seller_name": "techresale",
-      "seller_feedback_count": 1842,
-      "seller_feedback_percent": 99.6,
-      "categoryId": "9355"
+      "item_id": "256637082114",
+      "categoryId": "9355",
+      "item_link": "https://www.ebay.com/itm/256637082114",
+      "image_url": "https://i.ebayimg.com/images/g/abc/s-l500.webp"
     }
   ]
 }
