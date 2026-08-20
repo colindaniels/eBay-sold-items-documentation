@@ -1,3 +1,5 @@
+
+
 # trawl — API reference (LLM-readable)
 
 Premium data APIs for developers. Plain HTTPS: send a request with an API key,
@@ -93,7 +95,7 @@ Response shape (one result shown):
 {
   "site": "EBAY_US",
   "currency": "USD",
-  "query": ["iphone", "15", "pro"],
+  "query": ["iphone", "15", "pro", "256gb"],
   "filters": { "condition": ["used"] },
   "page": 1,
   "count": 240,
