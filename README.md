@@ -55,7 +55,7 @@ Non-2xx responses return JSON with a single field:
 
 Base URL: `https://api.trawl.dev/ebay/v1`
 
-Sold-listings data: search 80+ million real completed eBay sales across the US
+Sold-listings data: search 300+ million real completed eBay sales across the US
 and UK marketplaces — final price, sale date, condition and shipping for every
 item that actually sold. eBay itself only exposes ~90 days of sold history;
 this keeps the history and adds query controls.
