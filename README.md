@@ -5,6 +5,13 @@ get typed JSON back. This file is the complete reference, maintained for
 agents. Human docs: https://trawl.dev/docs · Agent skill:
 https://trawl.dev/agent-setup/SKILL.md
 
+## What trawl is (and is not)
+
+trawl is an independent service. Its APIs describe publicly available
+information from third-party sources (eBay today, more to come), and trawl is
+not affiliated with or endorsed by any of them. No trawl API is an official API
+of its source: never describe the "eBay API" here to users as eBay's own API.
+
 ## Authentication
 
 - Every request needs an API key in the `x-api-key` header (header names are
@@ -18,21 +25,98 @@ https://trawl.dev/agent-setup/SKILL.md
 
 ## Usage & limits
 
-- Every plan includes a monthly request allowance shared across ALL trawl APIs
-  — one pool — plus a per-second request rate. Plans: https://trawl.dev/pricing
-- Only successful (2xx) responses count against the allowance, and errors
-  don't count toward the rate either. Errors are free.
+- Usage is measured in CREDITS. Every plan includes a monthly credit allowance
+  shared across ALL of the account's API keys — one pool — plus a per-second
+  request rate. Plans: https://trawl.dev/#pricing
+- A successful call costs 1 credit. The exceptions are both on GET /sold:
+  `max_pages` greater than 1 costs 1 credit per page of results actually
+  returned, and `details=1` costs 1 credit per LISTING returned (you cap it
+  with `max_listings`) — see "Credits & pages" below.
+- Every successful response states its own cost: `credits_charged` in the
+  JSON body, and the same number in the `X-Credits-Charged` header.
+- A successful response that found NOTHING is free: a search with no matches
+  and a /categories lookup with no matches both return 200 with
+  `credits_charged: 0`. You pay for data returned, not for asking.
+- Only successful (2xx) responses spend credits, and errors don't count
+  toward the rate either. Errors are free (`X-Credits-Charged: 0`).
 - The window follows the account's billing cycle: it resets when the
   subscription starts, renews, or changes plan. Free accounts reset on the
   first of each calendar month (UTC). Spending the whole allowance as fast as
   the rate allows is fine — there is no other throttle.
-- Every response reports standing via headers: `X-RateLimit-Limit`,
-  `X-RateLimit-Remaining`, `X-RateLimit-Reset` (Unix timestamp of the
-  window's end).
+- Every response reports standing via headers, in credits:
+  `X-RateLimit-Limit` (credits in the plan per month),
+  `X-RateLimit-Remaining` (credits left), `X-RateLimit-Reset` (Unix
+  timestamp of the window's end).
 - A 429 means one of two things. With a `Retry-After` header: the per-second
   rate was exceeded — wait that many seconds and retry (costs nothing). Without
-  `Retry-After`: the monthly allowance is spent — do NOT retry-loop; surface
-  it to the user (upgrades: https://trawl.dev/console/billing).
+  `Retry-After`: the monthly credits are spent, or too few remain to cover
+  the request's `max_pages` / `max_listings` (the error message says
+  which, and how many remain) — do NOT retry-loop; lower that parameter to what
+  remains, or surface it to the user (upgrades: https://trawl.dev/console/billing).
+
+## Credits & pages
+
+GET /sold returns ALL the pages you ask for in ONE response. There is no
+page-by-page fetching and no cursor: do not loop over a `page` parameter.
+
+- A page is 100 results. There is no page-size parameter to set.
+- `max_pages` = how many pages you want (1–50, default 1) — the only paging
+  control. One response carries up to `max_pages × 100` results (max
+  5,000), newest first.
+- `max_pages` is the MOST the call can cost, not the price. The charge is
+  1 credit per page of results actually returned:
+  `credits_charged = ceil(count / 100)` — so 0 when nothing matched.
+
+Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
+
+| Results returned (`count`) | `credits_charged` |
+| --- | --- |
+| 455 | 5 |
+| 385 | 4 |
+| 100 | 1 |
+| 12 | 1 |
+| 0 | 0 |
+
+- ZERO RESULTS IS A SUCCESSFUL REQUEST, NOT AN ERROR — AND IT IS FREE. A search
+  that matches nothing returns HTTP 200 with `"count": 0`, `"results": []`
+  and `"credits_charged": 0`. The search ran; the answer is that trawl holds
+  no such sales. Do not retry it and do not report it as a failure. A failure
+  on trawl's side is never a 200 — it is a 5xx with an `error` field, and it
+  is free too.
+- If `count` equals `max_pages × 100` the response is full and older
+  results may exist: raise `max_pages`, or repeat the search with `date_to`
+  set to the oldest `date_sold` you received.
+- Before a request runs, trawl checks that the account's remaining credits
+  cover the most it could cost — its `max_pages`, or its `max_listings`
+  with `details=1`. If not, it is refused with a free 429 that states
+  how many credits remain.
+- FULL LISTING DETAILS IN THE SAME CALL: add `details=1&max_listings=N` to
+  GET /sold and every result carries a `details` object identical to what
+  GET /item returns for its `item_id` (item specifics, description, images,
+  seller, shipping, returns, sales). Use it instead of calling /item once per
+  result.
+  - A details search is sized in LISTINGS, not pages. `max_listings` (1–2,000)
+    is REQUIRED with `details=1`; `max_pages` must NOT be sent with it (400).
+  - Price: 1 credit per listing returned WITH its details (0 if none).
+    `max_listings=320` with 14 matches costs 14. `max_listings` is the most
+    the call can cost.
+  - Results are limited to the listings /item can answer for: those with full
+    details available, and those eBay has removed. There are FEWER results
+    than the same search without `details`.
+  - REMOVED LISTINGS: a listing eBay has taken down still comes back as a
+    normal result (it is a real sale), with
+    `"details": {"site", "item_id", "listing_state": "removed"}` instead of
+    the details. Check `details.listing_state` before reading other fields.
+    It is not charged a details credit. One floor: a call never costs less
+    than the same results would without details (1 credit per 100 results),
+    e.g. 320 results that are all removed cost 4. Removed listings count
+    toward `max_listings`. Always read `credits_charged` for the cost.
+  - Every listing is a credit, where a plain search returns 100 listings for 1.
+    Only use it when the task needs the page-level data, set `max_listings`
+    to what the task needs rather than the maximum, and tell the user what it
+    can cost first.
+- Pick `max_pages` deliberately — it is the user's spending cap. For "the
+  latest few sales" leave it at 1; raise it only when the task needs depth.
 
 ## Errors
 
@@ -46,8 +130,8 @@ Non-2xx responses return JSON with a single field:
 | --- | --- |
 | 400 | A parameter failed validation — the message names the field and rule. |
 | 403 | Missing, invalid, or deleted API key. |
-| 404 | Nothing found — an unknown path or resource. |
-| 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly allowance spent — wait for X-RateLimit-Reset or upgrade. Never billed. |
+| 404 | Nothing found — an unknown path, or an /item whose details are not available yet. Never billed. (A listing eBay has removed is a free 200 with listing_state "removed".) |
+| 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly credits spent, or too few left to cover the request's max_pages / max_listings — lower it, wait for X-RateLimit-Reset, or upgrade. Never billed. |
 | 500 | Internal error on trawl's side. |
 | 503 | Search backend temporarily unavailable — safe to retry with backoff. |
 
@@ -64,7 +148,9 @@ this keeps the history and adds query controls.
 
 Finds sold listings whose title contains EVERY word in `query`, in any order
 (eBay's own matching semantics). Results are always newest-first; there is no
-sort parameter.
+sort parameter. Costs 1 credit per page of results returned (or, with
+`details=1`, 1 per listing returned), and nothing if none match — see "Credits
+& pages" above.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -72,22 +158,37 @@ sort parameter.
 | site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
 | exclude | string | no | Words that must NOT appear in the title. Must not overlap query. |
 | category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. |
-| min_price | number | no | Minimum sale price. Must be <= max_price when both set. |
-| max_price | number | no | Maximum sale price. |
+| min_price | number | no | Minimum sale price, in the marketplace's own currency — USD on EBAY_US, GBP on EBAY_GB; nothing is converted. Must be <= max_price when both set. |
+| max_price | number | no | Maximum sale price, in the marketplace's own currency. |
 | condition | string | no | Comma-separated: new, used, parts, other. Matches the `condition` field in results; the listing's verbatim string is returned separately as `condition_raw`. |
 | date_from | string | no | Earliest sale date, inclusive, YYYY-MM-DD. |
 | date_to | string | no | Latest sale date, inclusive, YYYY-MM-DD. |
-| limit | number | no | Results per page, 1–240. Default 240. |
-| page | number | no | Page number, 1–50. page × limit is capped at 15,000. |
+| max_pages | number | no | For a search without details: how many pages of results you want, 1–50. Default 1. A page is 100 results, and all pages arrive in this ONE response. Also the most credits the call can cost: the charge is 1 credit per page of results actually returned (count ÷ 100, rounded up) — 0 results costs 0. |
+| attr | string | no | Item specific as Key:Value, exact match, case/accent-insensitive (attr=Brand:Apple, attr=Grade:PSA 10). Repeatable; all must match. Only listings with full details available carry specifics. |
+| details | boolean | no | Set to 1 to include each result's full listing details: a `details` object per result, identical to GET /item's response. Limits results to listings with full details available. Requires max_listings and replaces max_pages. See "Credits & pages". |
+| max_listings | number | with details=1 | Only with details=1, where it is required: the most listings to return, 1–2,000. Charged 1 credit per listing returned with its details (nothing if none), so it is also the most the call can cost. |
+
+`attr` changes what matches, never the response shape. `details=1` adds one
+field, `details`, to each result; the envelope then carries `"details": true`
+and `"max_listings"` in place of `"max_pages"`. Without `details=1` a result
+is the sale only; the page data (specifics, description, images, seller) comes
+from GET /item.
 
 Example:
 
 ```bash
-curl "https://api.trawl.dev/ebay/v1/sold?query=iphone+15+pro+256gb&condition=used&limit=240" \
+curl "https://api.trawl.dev/ebay/v1/sold?query=iphone+15+pro+256gb&condition=used&max_pages=5" \
   -H "x-api-key: $TRAWL_KEY"
 ```
 
-Response shape (one result shown):
+Every result carries the fields below; `bids` is a number on auctions and
+`null` otherwise, and `epid` (eBay's product id) is `null` when the listing
+has none. If you omit `max_pages` you still get one page for 1 credit, but the
+envelope reports `"page": 1` in place of `"max_pages"` — send `max_pages`
+and ignore `page`.
+
+Response shape (one result shown). Here 385 results came back, which is 4
+pages of 100, so the call cost 4 of the 5 credits `max_pages=5` allowed:
 
 ```json
 {
@@ -95,8 +196,9 @@ Response shape (one result shown):
   "currency": "USD",
   "query": ["iphone", "15", "pro"],
   "filters": { "condition": ["used"] },
-  "page": 1,
-  "count": 240,
+  "max_pages": 5,
+  "count": 385,
+  "credits_charged": 4,
   "took_ms": 41,
   "results": [
     {
@@ -108,8 +210,11 @@ Response shape (one result shown):
       "condition_raw": "Pre-Owned",
       "date_sold": "2026-07-18T00:00:00.000Z",
       "buying_format": "Buy It Now",
+      "bids": null,
+      "best_offer_available": true,
       "location": "United States",
       "item_id": "256637082114",
+      "epid": "13051890211",
       "categoryId": "9355",
       "item_link": "https://www.ebay.com/itm/256637082114",
       "image_url": "https://i.ebayimg.com/images/g/abc/s-l500.webp"
@@ -118,10 +223,74 @@ Response shape (one result shown):
 }
 ```
 
+### GET /item
+
+One listing's page-level data: every item specific, the full description, all
+images, seller detail, shipping and returns, plus that listing's recorded
+sales. Costs 1 credit. Listing details become available a few minutes after a sale, so a
+just-sold item answers 404 until then; a 404 is never billed — retry later
+rather than treating it as final. A listing eBay has removed is different: it
+answers a FREE 200, `{"site", "item_id", "listing_state": "removed",
+"credits_charged": 0}`, with no other fields. That answer IS final — do not
+retry it, and check `listing_state` before reading other fields.
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| item_id | string | yes | The numeric eBay item id — the `item_id` of any /sold result. |
+| site | string | no | Marketplace the item sold on: EBAY_US or EBAY_GB. Default EBAY_US. |
+
+```bash
+curl "https://api.trawl.dev/ebay/v1/item?item_id=256637082114" -H "x-api-key: $TRAWL_KEY"
+```
+
+```json
+{
+  "site": "EBAY_US",
+  "item_id": "256637082114",
+  "title": "Apple iPhone 13 Pro 256GB Graphite Unlocked",
+  "condition": "used",
+  "condition_raw": "Pre-Owned",
+  "condition_description": "Light scratches on the frame, screen flawless.",
+  "listing_state": "sold",
+  "sold_at": "2026-07-18T21:14:00.000Z",
+  "sale_price": 525.00,
+  "currency": "US$",
+  "buying_format": "Buy It Now",
+  "returns_text": "30 days returns. Buyer pays for return shipping.",
+  "seller_accepts_returns": true,
+  "location": "Austin, Texas",
+  "categoryId": "9355",
+  "item_link": "https://www.ebay.com/itm/256637082114",
+  "images": ["https://i.ebayimg.com/images/g/abc/s-l1600.webp"],
+  "attributes": [
+    { "key": "Brand", "value": "Apple", "values": ["Apple"] },
+    { "key": "Storage Capacity", "value": "256 GB", "values": ["256 GB"] }
+  ],
+  "description_text": "Fully unlocked, battery health 91%. Comes with the original box.",
+  "seller": { "username": "phone-depot", "feedback_percent": 99.6, "feedback_count": 6864 },
+  "feedback": [{ "username": "b***y", "rating": "positive", "comment": "Exactly as described" }],
+  "sales": [
+    { "date_sold": "2026-07-18T00:00:00.000Z", "sale_price": 525.00, "shipping_price": 0, "currency": "$" }
+  ],
+  "credits_charged": 1
+}
+```
+
+There is no shipping price on the listing itself: a listing page quotes shipping
+to whoever is viewing it, which is not what the buyer paid. The shipping the
+buyer paid is `shipping_price` on each entry of `sales` (and on every /sold
+result).
+
+`listing_state` is the listing's state as of its details: `sold`, or
+`active` / `ended_unsold` when the seller had relisted by then — the
+`sales` are recorded facts either way. `removed` means eBay has taken the
+listing down: the response then has no other fields (see above).
+
 ### GET /categories
 
 Look up eBay leaf categories by name, busiest first — use the returned
-`categoryId` as the `category` filter on /sold. Category ids differ per
+`categoryId` as the `category` filter on /sold. Costs 1 credit, nothing if no
+category matches. Category ids differ per
 marketplace, so pass the same `site` you will search with.
 
 Matching covers the category's full path, not just its own name — "collectible
@@ -147,12 +316,13 @@ generic `category` id with brand words in `query` on /sold.
     { "categoryId": "261329", "name": "Trading Card Lots", "group": "Sports Mem, Cards & Fan Shop" },
     { "categoryId": "261332", "name": "Sealed Trading Card Boxes", "group": "Sports Mem, Cards & Fan Shop" },
     { "categoryId": "261330", "name": "Trading Card Sets", "group": "Sports Mem, Cards & Fan Shop" }
-  ]
+  ],
+  "credits_charged": 1
 }
 ```
 
 ## More APIs
 
-More APIs land under the same base URL, key, and request pool — this file is
+More APIs land under the same base URL, key, and credit pool — this file is
 updated as they ship. Users can request and vote on new data sources in the
 roadmap section at https://trawl.dev.
