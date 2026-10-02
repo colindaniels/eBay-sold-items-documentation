@@ -27,11 +27,11 @@ of its source: never describe the "eBay API" here to users as eBay's own API.
 
 - Usage is measured in CREDITS. Every plan includes a monthly credit allowance
   shared across ALL of the account's API keys — one pool — plus a per-second
-  request rate. Plans: https://trawl.dev/#pricing
-- A successful call costs 1 credit. The exceptions are both on GET /sold:
-  `max_pages` greater than 1 costs 1 credit per page of results actually
-  returned, and `details=1` costs 1 credit per LISTING returned (you cap it
-  with `max_listings`) — see "Credits & pages" below.
+  request rate. Plans: https://trawl.dev/pricing
+- A successful call costs 1 credit. The one exception is GET /sold with
+  `max_pages` greater than 1, which costs 1 credit per page of results
+  actually returned — see "Credits & pages" below. Full listing details
+  (`details=1`) double that: 2 credits per page of results returned.
 - Every successful response states its own cost: `credits_charged` in the
   JSON body, and the same number in the `X-Credits-Charged` header.
 - A successful response that found NOTHING is free: a search with no matches
@@ -50,8 +50,8 @@ of its source: never describe the "eBay API" here to users as eBay's own API.
 - A 429 means one of two things. With a `Retry-After` header: the per-second
   rate was exceeded — wait that many seconds and retry (costs nothing). Without
   `Retry-After`: the monthly credits are spent, or too few remain to cover
-  the request's `max_pages` / `max_listings` (the error message says
-  which, and how many remain) — do NOT retry-loop; lower that parameter to what
+  the request's `max_pages` (the error message says how many remain) —
+  do NOT retry-loop; lower that parameter to what
   remains, or surface it to the user (upgrades: https://trawl.dev/console/billing).
 
 ## Credits & pages
@@ -60,12 +60,13 @@ GET /sold returns ALL the pages you ask for in ONE response. There is no
 page-by-page fetching and no cursor: do not loop over a `page` parameter.
 
 - A page is 100 results. There is no page-size parameter to set.
-- `max_pages` = how many pages you want (1–50, default 1) — the only paging
+- `max_pages` = how many pages you want (1–20, default 1) — the only paging
   control. One response carries up to `max_pages × 100` results (max
-  5,000), newest first.
+  2,000), newest first.
 - `max_pages` is the MOST the call can cost, not the price. The charge is
-  1 credit per page of results actually returned:
-  `credits_charged = ceil(count / 100)` — so 0 when nothing matched.
+  1 credit per page of results actually returned (2 with `details=1`):
+  `credits_charged = ceil(count / 100)`, doubled with details — so 0 when
+  nothing matched.
 
 Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
 
@@ -87,19 +88,19 @@ Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
   results may exist: raise `max_pages`, or repeat the search with `date_to`
   set to the oldest `date_sold` you received.
 - Before a request runs, trawl checks that the account's remaining credits
-  cover the most it could cost — its `max_pages`, or its `max_listings`
-  with `details=1`. If not, it is refused with a free 429 that states
-  how many credits remain.
-- FULL LISTING DETAILS IN THE SAME CALL: add `details=1&max_listings=N` to
+  cover the most it could cost — its `max_pages`, doubled with
+  `details=1`. If not, it is refused
+  with a free 429 that states how many credits remain.
+- FULL LISTING DETAILS IN THE SAME CALL: add `details=1` to
   GET /sold and every result carries a `details` object identical to what
   GET /item returns for its `item_id` (item specifics, description, images,
   seller, shipping, returns, sales). Use it instead of calling /item once per
   result.
-  - A details search is sized in LISTINGS, not pages. `max_listings` (1–2,000)
-    is REQUIRED with `details=1`; `max_pages` must NOT be sent with it (400).
-  - Price: 1 credit per listing returned WITH its details (0 if none).
-    `max_listings=320` with 14 matches costs 14. `max_listings` is the most
-    the call can cost.
+  - Price: 2 credits per page of 100 results returned (1 without details),
+    0 if none. 100 listings with their details cost 2 credits.
+  - Sized with `max_pages` like any search (1–20, up to 2,000 listings);
+    each result is ~8 KB with its details. For more, repeat with `date_to`
+    set to the oldest `date_sold` received.
   - Results are limited to the listings /item can answer for: those with full
     details available, and those eBay has removed. There are FEWER results
     than the same search without `details`.
@@ -107,14 +108,8 @@ Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
     normal result (it is a real sale), with
     `"details": {"site", "item_id", "listing_state": "removed"}` instead of
     the details. Check `details.listing_state` before reading other fields.
-    It is not charged a details credit. One floor: a call never costs less
-    than the same results would without details (1 credit per 100 results),
-    e.g. 320 results that are all removed cost 4. Removed listings count
-    toward `max_listings`. Always read `credits_charged` for the cost.
-  - Every listing is a credit, where a plain search returns 100 listings for 1.
-    Only use it when the task needs the page-level data, set `max_listings`
-    to what the task needs rather than the maximum, and tell the user what it
-    can cost first.
+  - It doubles the page price and responses are much larger: use it when the
+    task needs the page-level data.
 - Pick `max_pages` deliberately — it is the user's spending cap. For "the
   latest few sales" leave it at 1; raise it only when the task needs depth.
 
@@ -131,7 +126,7 @@ Non-2xx responses return JSON with a single field:
 | 400 | A parameter failed validation — the message names the field and rule. |
 | 403 | Missing, invalid, or deleted API key. |
 | 404 | Nothing found — an unknown path, or an /item whose details are not available yet. Never billed. (A listing eBay has removed is a free 200 with listing_state "removed".) |
-| 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly credits spent, or too few left to cover the request's max_pages / max_listings — lower it, wait for X-RateLimit-Reset, or upgrade. Never billed. |
+| 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly credits spent, or too few left to cover the request's max_pages — lower it, wait for X-RateLimit-Reset, or upgrade. Never billed. |
 | 500 | Internal error on trawl's side. |
 | 503 | Search backend temporarily unavailable — safe to retry with backoff. |
 
@@ -148,9 +143,8 @@ this keeps the history and adds query controls.
 
 Finds sold listings whose title contains EVERY word in `query`, in any order
 (eBay's own matching semantics). Results are always newest-first; there is no
-sort parameter. Costs 1 credit per page of results returned (or, with
-`details=1`, 1 per listing returned), and nothing if none match — see "Credits
-& pages" above.
+sort parameter. Costs 1 credit per page of results returned (2 with
+`details=1`), and nothing if none match — see "Credits & pages" above.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -163,14 +157,13 @@ sort parameter. Costs 1 credit per page of results returned (or, with
 | condition | string | no | Comma-separated: new, used, parts, other. Matches the `condition` field in results; the listing's verbatim string is returned separately as `condition_raw`. |
 | date_from | string | no | Earliest sale date, inclusive, YYYY-MM-DD. |
 | date_to | string | no | Latest sale date, inclusive, YYYY-MM-DD. |
-| max_pages | number | no | For a search without details: how many pages of results you want, 1–50. Default 1. A page is 100 results, and all pages arrive in this ONE response. Also the most credits the call can cost: the charge is 1 credit per page of results actually returned (count ÷ 100, rounded up) — 0 results costs 0. |
-| attr | string | no | Item specific as Key:Value, exact match, case/accent-insensitive (attr=Brand:Apple, attr=Grade:PSA 10). Repeatable; all must match. Only listings with full details available carry specifics. |
-| details | boolean | no | Set to 1 to include each result's full listing details: a `details` object per result, identical to GET /item's response. Limits results to listings with full details available. Requires max_listings and replaces max_pages. See "Credits & pages". |
-| max_listings | number | with details=1 | Only with details=1, where it is required: the most listings to return, 1–2,000. Charged 1 credit per listing returned with its details (nothing if none), so it is also the most the call can cost. |
+| max_pages | number | no | How many pages of results you want, 1–20. Default 1. A page is 100 results, and all pages arrive in this ONE response. Also the most credits the call can cost: the charge is 1 credit per page of results actually returned (count ÷ 100, rounded up), 2 per page with details=1 — 0 results costs 0. |
+| attr | string | no | Item specific as Key:Value, exact match, case/accent-insensitive (attr=Brand:Apple, attr=Grade:PSA 10). Repeatable: different keys must ALL match; repeating the SAME key matches ANY of its values (attr=Grade:9&attr=Grade:10 is grade 9 or 10). Max 16 attr parameters in total. Only listings with full details available carry specifics. |
+| details | boolean | no | Set to 1 to include each result's full listing details, for 2 credits per page instead of 1: a `details` object per result, identical to GET /item's response. Limits results to listings with full details available. See "Credits & pages". |
 
 `attr` changes what matches, never the response shape. `details=1` adds one
-field, `details`, to each result; the envelope then carries `"details": true`
-and `"max_listings"` in place of `"max_pages"`. Without `details=1` a result
+field, `details`, to each result, and `"details": true` to the envelope.
+Without `details=1` a result
 is the sale only; the page data (specifics, description, images, seller) comes
 from GET /item.
 
@@ -223,6 +216,17 @@ pages of 100, so the call cost 4 of the 5 credits `max_pages=5` allowed:
 }
 ```
 
+`condition_raw` is eBay's own wording and can be `null`: on older sales the
+condition slot sometimes held seller advert text or a catalog attribute, and
+anything that is not a condition is withheld. Newer sales pass eBay's text
+through verbatim, including labels not listed here.
+
+TRADING CARDS AND COINS: a /sold result says only "Pre-Owned" (or "New (Other)"
+for a slab) — eBay's sold search carries nothing more. The card condition,
+grader and grade are on the listing page: use `details=1` and read
+`details.condition_raw` and `details.grading` (see GET /item). Do not infer
+a card's condition from the top-level `condition_raw`.
+
 ### GET /item
 
 One listing's page-level data: every item specific, the full description, all
@@ -251,6 +255,7 @@ curl "https://api.trawl.dev/ebay/v1/item?item_id=256637082114" -H "x-api-key: $T
   "condition": "used",
   "condition_raw": "Pre-Owned",
   "condition_description": "Light scratches on the frame, screen flawless.",
+  "grading": null,
   "listing_state": "sold",
   "sold_at": "2026-07-18T21:14:00.000Z",
   "sale_price": 525.00,
@@ -281,10 +286,38 @@ to whoever is viewing it, which is not what the buyer paid. The shipping the
 buyer paid is `shipping_price` on each entry of `sales` (and on every /sold
 result).
 
-`listing_state` is the listing's state as of its details: `sold`, or
-`active` / `ended_unsold` when the seller had relisted by then — the
-`sales` are recorded facts either way. `removed` means eBay has taken the
+`listing_state` is what the listing's page showed when its details were read:
+`sold`, `active` or `ended_unsold`. `removed` means eBay has taken the
 listing down: the response then has no other fields (see above).
+
+AN `active` LISTING IS STILL A SOLD ITEM — READ `sales`. Every item_id trawl
+holds sold at least once. `active` means the listing was still live when its
+page was read: a multi-quantity listing with stock left (the usual case), or a
+relist. A live page has no sold banner, so the page-level sale fields are
+`null`: `sold_at`, `sale_price` and `best_offer_accepted`. There is no
+top-level `date_sold` on /item at all. The sale dates and prices are in
+`sales` — one entry per recorded sale, newest first, each with `date_sold`,
+`sale_price`, `shipping_price` and `currency`. The same applies to
+`ended_unsold`. Rule: for when and for how much, read `sales[]` (or the
+/sold result); use the top-level `sold_at` / `sale_price` only when
+`listing_state` is `sold`. Do not treat a null `sold_at` as "not sold".
+
+`grading` is for trading cards and coins, `null` on everything else. eBay's
+sold search says only "Pre-Owned" for these; the listing page says
+"Graded - PSA 10" or "Ungraded - Near mint or better" (that string is
+`condition_raw` here), and `grading` splits it:
+
+```json
+{ "graded": true,  "grader": "PSA", "grade": "10", "condition": null }
+{ "graded": false, "grader": null,  "grade": null, "condition": "Near mint or better" }
+```
+
+`grading.condition` is the declared condition of an UNGRADED item only
+("Near mint or better", "Lightly played (Excellent)", "Moderately played (Very
+good)", "Heavily played"; coins: "Uncirculated" etc.) — a slab has none,
+its grade is its condition. If a graded line has no trailing grade, the whole
+tail is in `grader` and `grade` is null. `grade` is a string ("9.5",
+"Authentic").
 
 ### GET /categories
 
