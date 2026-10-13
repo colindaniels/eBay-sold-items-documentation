@@ -1,9 +1,26 @@
-# trawl — API reference (LLM-readable)
+# eBay sold items API — documentation
 
-Premium data APIs for developers. Plain HTTPS: send a request with an API key,
-get typed JSON back. This file is the complete reference, maintained for
-agents. Human docs: https://trawl.dev/docs · Agent skill:
-https://trawl.dev/agent-setup/SKILL.md
+[trawl](https://trawl.dev) is an [eBay sold items API](https://trawl.dev/apis/ebay):
+search 400+ million completed eBay sales on ebay.com and ebay.co.uk, with history past
+eBay's own 90 days, and get the final price, sale date, condition, shipping, seller and
+item specifics of every one as JSON over a single GET. trawl is an independent service,
+not an official eBay API.
+
+This file is the complete API reference, in the same plain text as
+https://trawl.dev/llms.md, so that people and agents read the same thing.
+
+- Product page: [eBay sold items API](https://trawl.dev/apis/ebay)
+- Human docs: https://trawl.dev/docs · OpenAPI spec: https://trawl.dev/openapi.json ·
+  Agent skill: https://trawl.dev/agent-setup/SKILL.md
+- Python client: https://github.com/trawl-inc/trawl-python (`pip install trawl-api`)
+- Guides: [findCompletedItems alternative](https://trawl.dev/guides/findcompleteditems-alternative) ·
+  [Scrape eBay sold listings in Python](https://trawl.dev/guides/scrape-ebay-sold-listings-python) ·
+  [eBay sold listings history beyond 90 days](https://trawl.dev/guides/ebay-sold-listings-history) ·
+  [Does eBay API return sold listings?](https://trawl.dev/guides/does-ebay-api-return-sold-listings)
+- Compared with: [the eBay Marketplace Insights API](https://trawl.dev/compare/trawl-vs-ebay-marketplace-insights-api) ·
+  [Terapeak](https://trawl.dev/compare/trawl-vs-terapeak-api) ·
+  [Apify eBay scrapers](https://trawl.dev/compare/trawl-vs-apify-ebay-sold-listings-scrapers)
+- Free API key: https://trawl.dev/signup (no card; plans at https://trawl.dev/pricing)
 
 ## What trawl is (and is not)
 
@@ -37,8 +54,9 @@ of its source: never describe the "eBay API" here to users as eBay's own API.
 - A successful response that found NOTHING is free: a search with no matches
   and a /categories lookup with no matches both return 200 with
   `credits_charged: 0`. You pay for data returned, not for asking.
-- Only successful (2xx) responses spend credits, and errors don't count
-  toward the rate either. Errors are free (`X-Credits-Charged: 0`).
+- Only successful (2xx) responses spend credits. Errors are free
+  (`X-Credits-Charged: 0`), but they still take a slot in the per-second
+  rate, so a loop of failing requests will hit 429s.
 - The window follows the account's billing cycle: it resets when the
   subscription starts, renews, or changes plan. Free accounts reset on the
   first of each calendar month (UTC). Spending the whole allowance as fast as
@@ -126,6 +144,7 @@ Non-2xx responses return JSON with a single field:
 | 400 | A parameter failed validation — the message names the field and rule. |
 | 403 | Missing, invalid, or deleted API key. |
 | 404 | Nothing found — an unknown path, or an /item whose details are not available yet. Never billed. (A listing eBay has removed is a free 200 with listing_state "removed".) |
+| 413 | The request body is larger than 262,144 bytes. Every endpoint is a GET with query parameters; nothing needs a body. |
 | 429 | With Retry-After header: per-second rate exceeded — wait and retry. Without: monthly credits spent, or too few left to cover the request's max_pages — lower it, wait for X-RateLimit-Reset, or upgrade. Never billed. |
 | 500 | Internal error on trawl's side. |
 | 503 | Search backend temporarily unavailable — safe to retry with backoff. |
@@ -134,7 +153,7 @@ Non-2xx responses return JSON with a single field:
 
 Base URL: `https://api.trawl.dev/ebay/v1`
 
-Sold-listings data: search 300+ million real completed eBay sales across the US
+Sold-listings data: search 400+ million real completed eBay sales across the US
 and UK marketplaces — final price, sale date, condition and shipping for every
 item that actually sold. eBay itself only exposes ~90 days of sold history;
 this keeps the history and adds query controls.
@@ -148,9 +167,9 @@ sort parameter. Costs 1 credit per page of results returned (2 with
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| query | string | yes | Words that must all appear in the listing title, in any order. |
+| query | string | yes | Words that must all appear in the listing title, in any order. Up to 32 words. |
 | site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
-| exclude | string | no | Words that must NOT appear in the title. Must not overlap query. |
+| exclude | string | no | Words that must NOT appear in the title. Must not overlap query. Up to 32 words. |
 | category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. |
 | min_price | number | no | Minimum sale price, in the marketplace's own currency — USD on EBAY_US, GBP on EBAY_GB; nothing is converted. Must be <= max_price when both set. |
 | max_price | number | no | Maximum sale price, in the marketplace's own currency. |
@@ -240,7 +259,7 @@ retry it, and check `listing_state` before reading other fields.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| item_id | string | yes | The numeric eBay item id — the `item_id` of any /sold result. |
+| item_id | string | yes | The numeric eBay item id, 9 to 15 digits — the `item_id` of any /sold result. |
 | site | string | no | Marketplace the item sold on: EBAY_US or EBAY_GB. Default EBAY_US. |
 
 ```bash
@@ -335,7 +354,7 @@ generic `category` id with brand words in `query` on /sold.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| query | string | yes | Words to match against category names and their parent path — every word must appear, in any order. Case- and accent-insensitive. A numeric query is an id lookup instead: it returns that exact category (with a `leaf` flag — only leaf ids work as the /sold category filter). |
+| query | string | yes | Words to match against category names and their parent path — every word must appear, in any order. Case- and accent-insensitive; only the first 12 words are used, and at most 200 categories come back. A numeric query is an id lookup instead: it returns that exact category (with a `leaf` flag — only leaf ids work as the /sold category filter). |
 | site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
 
 ```json
