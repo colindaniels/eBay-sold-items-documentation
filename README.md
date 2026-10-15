@@ -240,6 +240,17 @@ condition slot sometimes held seller advert text or a catalog attribute, and
 anything that is not a condition is withheld. Newer sales pass eBay's text
 through verbatim, including labels not listed here.
 
+BEST OFFER SALES: a /sold result's `sale_price` is the LISTED price, because
+eBay's sold search shows only that; `buying_format` says "Best Offer" and
+`best_offer_available` says the listing took offers, but neither says an
+offer was accepted. For the amount actually paid, pass `details=1` and read
+`details.sale_price` where `details.best_offer_accepted` is true. eBay
+publishes the accepted amount on Collectibles listings only (trading cards,
+comics, coins and the like); on every other category no source has it, and
+the listed price is the best available figure. When a user compares prices
+with another service, say this: the data is the same, the accepted amount is
+in the details.
+
 TRADING CARDS AND COINS: a /sold result says only "Pre-Owned" (or "New (Other)"
 for a slab) — eBay's sold search carries nothing more. The card condition,
 grader and grade are on the listing page: use `details=1` and read
