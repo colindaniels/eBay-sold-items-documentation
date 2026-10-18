@@ -1,10 +1,11 @@
-# eBay sold items API — documentation
+# eBay sold listings API — documentation
 
-[trawl](https://trawl.dev) is an [eBay sold items API](https://trawl.dev/apis/ebay):
-search 400+ million completed eBay sales on ebay.com and ebay.co.uk, with history past
-eBay's own 90 days, and get the final price, sale date, condition, shipping, seller and
-item specifics of every one as JSON over a single GET. trawl is an independent service,
-not an official eBay API.
+[trawl](https://trawl.dev) is an [eBay sold listings API](https://trawl.dev): search
+400+ million completed eBay sales on ebay.com and ebay.co.uk, with history past eBay's
+own 90 days, and get the final price, sale date, condition, shipping, seller and item
+specifics of every one as JSON over a single GET. A category on its own, with no
+keyword, returns every sale in it, and a cursor walks past 2,000 results. trawl is an
+independent service, not an official eBay API.
 
 This file is the complete API reference, in the same plain text as
 https://trawl.dev/llms.md, so that people and agents read the same thing.
@@ -16,10 +17,13 @@ https://trawl.dev/llms.md, so that people and agents read the same thing.
 - Guides: [findCompletedItems alternative](https://trawl.dev/guides/findcompleteditems-alternative) ·
   [Scrape eBay sold listings in Python](https://trawl.dev/guides/scrape-ebay-sold-listings-python) ·
   [eBay sold listings history beyond 90 days](https://trawl.dev/guides/ebay-sold-listings-history) ·
-  [Does eBay API return sold listings?](https://trawl.dev/guides/does-ebay-api-return-sold-listings)
+  [Does eBay API return sold listings?](https://trawl.dev/guides/does-ebay-api-return-sold-listings) ·
+  [eBay sold comps API](https://trawl.dev/guides/ebay-sold-comps-api) ·
+  [eBay UK sold listings API](https://trawl.dev/guides/ebay-uk-sold-listings-api)
 - Compared with: [the eBay Marketplace Insights API](https://trawl.dev/compare/trawl-vs-ebay-marketplace-insights-api) ·
   [Terapeak](https://trawl.dev/compare/trawl-vs-terapeak-api) ·
-  [Apify eBay scrapers](https://trawl.dev/compare/trawl-vs-apify-ebay-sold-listings-scrapers)
+  [Apify eBay scrapers](https://trawl.dev/compare/trawl-vs-apify-ebay-sold-listings-scrapers) ·
+  [the SoldComps API](https://trawl.dev/compare/trawl-vs-soldcomps-api)
 - Free API key: https://trawl.dev/signup (no card; plans at https://trawl.dev/pricing)
 
 ## What trawl is (and is not)
@@ -75,7 +79,8 @@ of its source: never describe the "eBay API" here to users as eBay's own API.
 ## Credits & pages
 
 GET /sold returns ALL the pages you ask for in ONE response. There is no
-page-by-page fetching and no cursor: do not loop over a `page` parameter.
+page-by-page fetching: do not loop over a `page` parameter. To go past one
+response, send back its `next_cursor` (below).
 
 - A page is 100 results. There is no page-size parameter to set.
 - `max_pages` = how many pages you want (1–20, default 1) — the only paging
@@ -102,9 +107,17 @@ Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
   no such sales. Do not retry it and do not report it as a failure. A failure
   on trawl's side is never a 200 — it is a 5xx with an `error` field, and it
   is free too.
-- If `count` equals `max_pages × 100` the response is full and older
-  results may exist: raise `max_pages`, or repeat the search with `date_to`
-  set to the oldest `date_sold` you received.
+- CURSORS, FOR MORE THAN 2,000: if `count` equals `max_pages × 100` the
+  response is full, and its `next_cursor` is a string. Send it back unchanged
+  as `cursor=` on the SAME search (same site, query, exclude, category,
+  prices, dates, condition, attr and details — only `max_pages` may change)
+  and the next pages come back from exactly where the last response stopped.
+  Repeat until `next_cursor` is `null`: that was the end. There is no limit
+  to how far a cursor walks, so a whole category or a whole year is reachable,
+  one response at a time. Each call is priced like any other (1 credit per
+  page returned, 2 with details, 0 for an empty one). The cursor is a position,
+  not a session: never stored on trawl's side, never expires. A cursor from a
+  different search is refused with a free 400. Do not combine with `page`.
 - Before a request runs, trawl checks that the account's remaining credits
   cover the most it could cost — its `max_pages`, doubled with
   `details=1`. If not, it is refused
@@ -117,8 +130,8 @@ Worked example, `max_pages=5` (up to 500 results; can never cost more than 5):
   - Price: 2 credits per page of 100 results returned (1 without details),
     0 if none. 100 listings with their details cost 2 credits.
   - Sized with `max_pages` like any search (1–20, up to 2,000 listings);
-    each result is ~8 KB with its details. For more, repeat with `date_to`
-    set to the oldest `date_sold` received.
+    each result is ~8 KB with its details. For more, continue with
+    `next_cursor` (the cursor carries `details` with it).
   - Results are limited to the listings /item can answer for: those with full
     details available, and those eBay has removed. There are FEWER results
     than the same search without `details`.
@@ -161,16 +174,18 @@ this keeps the history and adds query controls.
 ### GET /sold
 
 Finds sold listings whose title contains EVERY word in `query`, in any order
-(eBay's own matching semantics). Results are always newest-first; there is no
+(eBay's own matching semantics). Or, with `category` and NO `query`, EVERY
+sale in that leaf category — the whole of it, newest first, walkable with
+`cursor` (see "Credits & pages"). Results are always newest-first; there is no
 sort parameter. Costs 1 credit per page of results returned (2 with
 `details=1`), and nothing if none match — see "Credits & pages" above.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| query | string | yes | Words that must all appear in the listing title, in any order. Up to 32 words. |
+| query | string | unless category | Words that must all appear in the listing title, in any order. Up to 32 words. Required unless `category` is set. |
 | site | string | no | Marketplace: EBAY_US or EBAY_GB. Default EBAY_US. |
 | exclude | string | no | Words that must NOT appear in the title. Must not overlap query. Up to 32 words. |
-| category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. |
+| category | number | no | Numeric leaf categoryId — find ids via /categories. Ids differ per marketplace. On its own, with no `query`, every sale in the category. |
 | min_price | number | no | Minimum sale price, in the marketplace's own currency — USD on EBAY_US, GBP on EBAY_GB; nothing is converted. Must be <= max_price when both set. |
 | max_price | number | no | Maximum sale price, in the marketplace's own currency. |
 | condition | string | no | Comma-separated: new, used, parts, other. Matches the `condition` field in results; the listing's verbatim string is returned separately as `condition_raw`. |
@@ -179,6 +194,15 @@ sort parameter. Costs 1 credit per page of results returned (2 with
 | max_pages | number | no | How many pages of results you want, 1–20. Default 1. A page is 100 results, and all pages arrive in this ONE response. Also the most credits the call can cost: the charge is 1 credit per page of results actually returned (count ÷ 100, rounded up), 2 per page with details=1 — 0 results costs 0. |
 | attr | string | no | Item specific as Key:Value, exact match, case/accent-insensitive (attr=Brand:Apple, attr=Grade:PSA 10). Repeatable: different keys must ALL match; repeating the SAME key matches ANY of its values (attr=Grade:9&attr=Grade:10 is grade 9 or 10). Max 16 attr parameters in total. Only listings with full details available carry specifics. |
 | details | boolean | no | Set to 1 to include each result's full listing details, for 2 credits per page instead of 1: a `details` object per result, identical to GET /item's response. Limits results to listings with full details available. See "Credits & pages". |
+| cursor | string | no | The `next_cursor` of a previous full response, unchanged, to continue the same search past its last result. Same search, any `max_pages`; never with `page`. See "Credits & pages". |
+
+Every sale in a category, one day, no keyword — the first 2,000 and a cursor
+for the rest:
+
+```bash
+curl "https://api.trawl.dev/ebay/v1/sold?category=261328&date_from=2026-10-01&date_to=2026-10-01&max_pages=20" \
+  -H "x-api-key: $TRAWL_KEY"
+```
 
 `attr` changes what matches, never the response shape. `details=1` adds one
 field, `details`, to each result, and `"details": true` to the envelope.
@@ -195,9 +219,9 @@ curl "https://api.trawl.dev/ebay/v1/sold?query=iphone+15+pro+256gb&condition=use
 
 Every result carries the fields below; `bids` is a number on auctions and
 `null` otherwise, and `epid` (eBay's product id) is `null` when the listing
-has none. If you omit `max_pages` you still get one page for 1 credit, but the
-envelope reports `"page": 1` in place of `"max_pages"` — send `max_pages`
-and ignore `page`.
+has none. If you omit `max_pages` you get one page for 1 credit, reported as
+`"max_pages": 1`. `next_cursor` is a string when the response is full and
+more may follow, `null` otherwise.
 
 Response shape (one result shown). Here 385 results came back, which is 4
 pages of 100, so the call cost 4 of the 5 credits `max_pages=5` allowed:
@@ -209,6 +233,7 @@ pages of 100, so the call cost 4 of the 5 credits `max_pages=5` allowed:
   "query": ["iphone", "15", "pro"],
   "filters": { "condition": ["used"] },
   "max_pages": 5,
+  "next_cursor": null,
   "count": 385,
   "credits_charged": 4,
   "took_ms": 41,
