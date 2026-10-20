@@ -14,6 +14,8 @@ https://trawl.dev/llms.md, so that people and agents read the same thing.
 - Human docs: https://trawl.dev/docs · OpenAPI spec: https://trawl.dev/openapi.json ·
   Agent skill: https://trawl.dev/agent-setup/SKILL.md
 - Python client: https://github.com/trawl-inc/trawl-python (`pip install trawl-api`)
+- On Apify: [eBay Sold Listings API Actor](https://apify.com/trawl/ebay-sold-listings-api)
+  (the same search, pay per sold listing, no trawl account needed)
 - Guides: [findCompletedItems alternative](https://trawl.dev/guides/findcompleteditems-alternative) ·
   [Scrape eBay sold listings in Python](https://trawl.dev/guides/scrape-ebay-sold-listings-python) ·
   [eBay sold listings history beyond 90 days](https://trawl.dev/guides/ebay-sold-listings-history) ·
